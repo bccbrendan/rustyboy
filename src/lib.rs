@@ -7,6 +7,6 @@ pub mod joypad;
 pub mod main_board;
 pub mod memory_management_unit;
 pub mod serial_cable;
-pub mod throttled_cpu;
 pub mod timer;
+pub mod memory;
 
