@@ -25,3 +25,6 @@ A toy gameboy emulator implemented in Rust
 └─────────────────────────────────────────────┘
 generated with asciiflow.com
 ```
+
+References
+https://gbdev.io/pandocs
