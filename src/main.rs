@@ -4,6 +4,7 @@ use rustyboy::main_board::MainBoard;
 
 fn main() {
     rog::reg("rustyboy");
+    rog::reg("rustyboy::cpu");
     let mut romfile = String::from("");
     {
         let mut ap = argparse::ArgumentParser::new();

@@ -67,12 +67,23 @@ impl Cpu {
         let opcode = self.fetch();
         let cycles = match opcode {
             // CPU Control Instructions
-            0x00 => {4}, // NOP
+            0x00 => {rog::debugln!("[{:#04X}] NOP", self.pc - 1); 4},
             // Jump instructions
-            0xC3 => { // jp
-                let target = self.fetch16();
-                self.pc = target;
-                16
+            0xC2 | 0xC3 | 0xCA | 0xD2 | 0xDA | 0xE9 | // jp 
+            0x18 | 0x20 | 0x28 | 0x30 | 0x38 |  // jr
+            0xC4 | 0xCC | 0xCD | 0xD4 | 0xDC |  // call
+            0xC0 | 0xC8 | 0xC9 | 0xD0 | 0xD8 | 0xD9  => { // ret+reti
+                self.emulate_jump_operation(opcode)
+            },
+            // LD operations
+            0x02 | 0x06 | 0x08 | 0x0A | 0x0E |
+            0x12 | 0x16 | 0x18 | 0x1A | 0x1E |
+            0x22 | 0x26 | 0x28 | 0x2A | 0x2E |
+            0x32 | 0x36 | 0x38 | 0x3A | 0x3E |
+            0x40 ..= 0x7F |
+            0xE0 | 0xE2 | 0xEA |
+            0xF0 | 0xF2 | 0xF8 | 0xF9 | 0xFA => { 
+                self.emulate_load_operation(opcode)
             },
             _ => panic!("Unrecognized opcode {:#02x} at addr {:#04x}", opcode, self.pc - 1),
         };
@@ -90,5 +101,50 @@ impl Cpu {
         let w = self.mmu.borrow().read16(self.pc);
         self.pc += 2;
         w
+    }
+
+    fn emulate_jump_operation(&mut self, opcode: u8) -> u32 {
+        match opcode {
+            0xC2 => panic!("unimplemented!"),
+            0xC3 => { // jp
+                let target = self.fetch16();
+                rog::debugln!("[{:#02X}] JP {:#04X}", self.pc - 3, target);
+                self.pc = target;
+                16
+            },
+            0xCA | 0xD2 | 0xDA | 0xE9 | // jp 
+            0x18 | 0x20 | 0x28 | 0x30 | 0x38 |  // jr
+            0xC4 | 0xCC => panic!("unimplemented opcode: {:#02x}", opcode),
+            0xCD => { // call
+                let target = self.fetch16();
+                rog::debugln!("[{:#02X}] CALL {:#04X}", self.pc - 3, target);
+                self.sp = self.sp - 2;
+                self.mmu.borrow_mut().write16(self.sp, self.pc);
+                self.pc = target;
+                24
+            },
+            0xD4 | 0xDC | 0xC0 | 0xC8 | 0xC9 | 0xD0 | 0xD8 | 0xD9  => panic!("unimplemented opcode: {:#02x}", opcode),
+            _ => panic!("unexpected opcode: {:#02x}", opcode),
+        }
+    }
+
+
+    fn emulate_load_operation(&mut self, opcode: u8) -> u32 {
+        match opcode {
+            0x02 | 0x06 | 0x08 | 0x0A | 0x0E |
+            0x12 | 0x16 | 0x18 | 0x1A | 0x1E |
+            0x22 | 0x26 | 0x28 | 0x2A | 0x2E |
+            0x32 | 0x36 | 0x38 | 0x3A | 0x3E |
+            0x40 ..= 0x7F |
+            0xE0 | 0xE2 | 0xEA |
+            0xF2 | 0xF8 | 0xF9 | 0xFA => panic!("Not yet implemented: {:#02X}", opcode),
+            0xF0 => {
+                let n = self.fetch();
+                rog::debugln!("[{:#04X}] LD A, 0xFF00+{:#02X}", self.pc - 2, n);
+                self.a = self.mmu.borrow().read8(0xFF00 + n as u16);
+                12
+            }
+            _ => panic!("Unsupported LD opcode: {:#02X}", opcode),
+        }
     }
 }

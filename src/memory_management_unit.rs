@@ -19,8 +19,9 @@ pub struct MemoryManagementUnit {
     pub timer: Timer,
     interrupts: Rc<RefCell<Interrupts>>,
     // hdma,
-    // hram,
+    pub hram: [u8; 128],// hram,
     // wram,
+    interrupt_enable: u8,
 }
 
 impl MemoryManagementUnit {
@@ -35,6 +36,8 @@ impl MemoryManagementUnit {
             serial_cable: SerialCable::init(interrupts.clone()),
             timer: Timer::init(interrupts.clone()),
             interrupts: interrupts.clone(),
+            hram: [0x0; 128],
+            interrupt_enable: 0x00,
         };
         mmu
     }
@@ -60,6 +63,8 @@ impl Memory for MemoryManagementUnit {
             // $FF51 $FF55 VRAM DMA
             // $FF68 $FF69 Palettes
             // $FF70       WRAM Bank Select
+            0xFF80 ..= 0xFFFE => self.hram[(addr - 0xFF80) as usize],
+            0xFFFF => self.interrupt_enable,
             _ => panic!("unimplemented address read on MemoryManagementUnit {:#04x}", addr)
         }
     }
@@ -78,7 +83,9 @@ impl Memory for MemoryManagementUnit {
             // $FF51 $FF55 VRAM DMA
             // $FF68 $FF69 Palettes
             // $FF70       WRAM Bank Select
-             _ => panic!("unimplemented address read on MemoryManagementUnit {:#04x}", addr),
+            0xFF80 ..= 0xFFFE => self.hram[(addr - 0xFF80) as usize] = data,
+            0xFFFF => self.interrupt_enable = data,
+             _ => panic!("unimplemented address write on MemoryManagementUnit {:#04x}", addr),
         }
     }
  }
