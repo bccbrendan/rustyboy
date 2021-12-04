@@ -1,3 +1,5 @@
+use std::time::{Instant, Duration};
+
 use rustyboy::main_board::MainBoard;
 
 fn main() {
@@ -12,4 +14,12 @@ fn main() {
     let mut main_board = MainBoard::init(&romfile[..]).unwrap();
     println!("Loaded rom type: {} title: {}", main_board.mmu.borrow().cartridge.get_type(),
         main_board.mmu.borrow().cartridge.get_title());
+
+    'game_loop: loop {
+        main_board.emulate_frame();
+        match main_board.mmu.borrow_mut().gpu.get_updated_image() {
+            None => {}
+            Some(updated_image) => {},
+        }
+    }
 }

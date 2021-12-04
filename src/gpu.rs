@@ -2,6 +2,9 @@ use std::{rc::Rc, cell::RefCell};
 use super::interrupts::Interrupts;
 use super::memory::Memory;
 
+pub const WIDTH: usize = 160;
+pub const HEIGHT: usize = 144;
+
 pub struct Gpu {
     pub interrupts: Rc<RefCell<Interrupts>>,
     obj_palette_0_data: u8,
@@ -19,6 +22,11 @@ impl Gpu {
              window_pos_y: 0,
             window_pos_x: 0,
         }
+    }
+
+    pub fn get_updated_image(&mut self) -> std::option::Option<[[u8; WIDTH]; HEIGHT]> {
+        None
+        // TODO
     }
 }
 

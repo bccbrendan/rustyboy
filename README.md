@@ -5,10 +5,10 @@ A toy gameboy emulator implemented in Rust
 ┌─────────────────────────────────────────────┐
 │MainBoard                                    │
 │ ┌────────────┐ ┌──────────────────────────┐ │
-│ │ThrottledCpu│ │MemoryManagementUnit      │ │
-│ │ ┌───┐      │ │ ┌───────────┐            │ │
-│ │ │Cpu│      │ │ │ Cartridge │      ┌─┐   │ │
-│ └─┴───┴──────┘ │ ├───┬───────┘      │I│   │ │
+│ │  Cpu       │ │MemoryManagementUnit      │ │
+│ │            ->│ ┌───────────┐            │ │
+│ │            │ │ │ Cartridge │      ┌─┐   │ │
+│ └────────────┘ │ ├───┬───────┘      │I│   │ │
 │                │ │Apu│              │n│   │ │
 │                │ ├───┤              │t│   │ │
 │                │ │Gpu├─────────────►│e│   │ │
