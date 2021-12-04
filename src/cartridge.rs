@@ -5,6 +5,19 @@ use super::memory::Memory;
 
 pub trait Cartridge: Memory {
     fn get_type(&self) -> String;
+    fn get_title(&self) -> String {
+        let start = 0x134;
+        let maybe_cgb_flag = self.read8(0x143);
+        let length = if maybe_cgb_flag == 0x80 || maybe_cgb_flag == 0xC0 { 11 } else { 16 };
+        let mut title_string = String::new();
+        for i in start .. start + length {
+            match self.read8(i) {
+                0x00 => break,
+                byte => title_string.push(byte as char),
+            }
+        }
+        title_string
+    }
 }
 
 
@@ -44,6 +57,7 @@ impl Cartridge for NoMbc {
     fn get_type(&self) -> String {
         "NoMbc".to_string()
     }
+
 }
 
 enum BankMode {

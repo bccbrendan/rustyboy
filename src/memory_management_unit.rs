@@ -36,29 +36,7 @@ impl MemoryManagementUnit {
             timer: Timer::init(interrupts.clone()),
             interrupts: interrupts.clone(),
         };
-        mmu.init_io_registers();
         mmu
-    }
-
-    fn init_io_registers(&mut self) {
-        // panic!("TODO - make an enum of memory map?");
-        // https://gbdev.io/pandocs/Memory_Map.html
-        // $FF00       Controller
-        // $FF01 $FF02	Communication
-        // $FF04 $FF07 Divider and Timer
-        self.write8(0xff04, 0x00);
-        // $FF10 $FF26 Sound
-        // $FF30 $FF3F Waveform RAM
-        // $FF40 $FF4B LCD
-        self.write8(0xff48, 0xff);  // obj palette 0 data
-        self.write8(0xff49, 0xff);  // obj palette 1 data
-        self.write8(0xff4a, 0x00);  // window position y
-        self.write8(0xff4b, 0x00);  // window position x
-        // $FF4F       VRAM Bank Select
-        // $FF50       Set to non-zero to disable boot ROM
-        // $FF51 $FF55 VRAM DMA
-        // $FF68 $FF69 Palettes
-        // $FF70       WRAM Bank Select
     }
 }
 
