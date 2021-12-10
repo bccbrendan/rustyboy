@@ -25,13 +25,13 @@ impl MainBoard {
     pub fn emulate_frame(&mut self) {
         let mut emulated_cycles = 0;
         let time_before = Instant::now();
-        const target_time: Duration = Duration::from_millis((1000.0_f64 / VSYNC_FREQ) as u64);
+        const TARGET_FRAME_TIME: Duration = Duration::from_millis((1000.0_f64 / VSYNC_FREQ) as u64);
         while emulated_cycles < CPU_CLOCKS_PER_FRAME {
             let cycles = self.cpu.emulate_operation();
             self.mmu.borrow_mut().run_cycles(cycles);
             emulated_cycles += cycles;
         }
-        let sleep_millis = target_time.checked_sub(Instant::now() - time_before);
+        let sleep_millis = TARGET_FRAME_TIME.checked_sub(Instant::now() - time_before);
         match sleep_millis {
             None => {}, // running below target fps
             Some(sleep_millis) => { 

@@ -64,6 +64,10 @@ impl Cpu {
         }
     }
 
+    fn is_set(&self, f: Flag) -> bool {
+        self.flags & f as u8 != 0
+    }
+
     fn set_flag(&mut self, f: Flag, set: u8) {
         match set {
             1 => self.flags |= f as u8,
@@ -84,10 +88,10 @@ impl Cpu {
             0xC4 | 0xCC | 0xCD | 0xD4 | 0xDC |  // call
             0xC0 | 0xC8 | 0xC9 | 0xD0 | 0xD8 | 0xD9  => self.emulate_jump_operation(opcode),
             // LD operations
-            0x02 | 0x06 | 0x08 | 0x0A | 0x0E |
-            0x12 | 0x16 | 0x18 | 0x1A | 0x1E |
-            0x22 | 0x26 | 0x28 | 0x2A | 0x2E |
-            0x32 | 0x36 | 0x38 | 0x3A | 0x3E |
+            0x02 | 0x06 | 0x0A | 0x0E |
+            0x12 | 0x16 | 0x1A | 0x1E |
+            0x22 | 0x26 | 0x2A | 0x2E |
+            0x32 | 0x36 | 0x3A | 0x3E |
             0x40 ..= 0x7F |
             0xE0 | 0xE2 | 0xEA |
             0xF0 | 0xF2 | 0xF8 | 0xF9 | 0xFA => self.emulate_load_operation(opcode),
@@ -133,6 +137,7 @@ impl Cpu {
                 self.mmu.borrow().read8(addr)
             },
             0x7 => self.a,
+            _ => panic!("impossible"),
         };
         operand
     }
@@ -161,12 +166,12 @@ impl Cpu {
             0xC2 => panic!("unimplemented!"),
             0xC3 => { // jp
                 let target = self.fetch16();
-                rog::debugln!("[{:#02X}] JP {:#04X}", self.pc - 3, target);
+                rog::debugln!("[{:#04X}] JP {:#04X}", self.pc - 3, target);
                 self.pc = target;
                 16
             },
             0xCA | 0xD2 | 0xDA | 0xE9 | // jp 
-            0x18 | 0x20 | 0x28 | 0x30 | 0x38 |  // jr
+            0x18 | 0x20 | 0x28 | 0x30 | 0x38 => self.op_jr(opcode),
             0xC4 | 0xCC => panic!("unimplemented opcode: {:#02x}", opcode),
             0xCD => { // call
                 let target = self.fetch16();
@@ -178,6 +183,23 @@ impl Cpu {
             },
             0xD4 | 0xDC | 0xC0 | 0xC8 | 0xC9 | 0xD0 | 0xD8 | 0xD9  => panic!("unimplemented opcode: {:#02x}", opcode),
             _ => panic!("unexpected opcode: {:#02x}", opcode),
+        }
+    }
+
+    // jump conditionally
+    fn op_jr(&mut self, opcode: u8) -> u32 {
+        let target = self.pc + u16::from(self.fetch());
+        rog::debugln!("[{:#04X}] JR {:#04X}", self.pc - 2, target);
+        let taken = opcode == 0x18 ||
+            (opcode == 0x20 && !self.is_set(Flag::Z)) ||
+            (opcode == 0x28 && self.is_set(Flag::Z)) ||
+            (opcode == 0x30 && !self.is_set(Flag::C)) ||
+            (opcode == 0x38 && self.is_set(Flag::C));
+        if taken {
+            self.pc = target;
+            12
+        } else {
+            8
         }
     }
 
@@ -208,6 +230,7 @@ impl Cpu {
     }
 
     fn emulate_8bit_arithmetic_or_logic(&mut self, opcode: u8) -> u32 {
+        rog::debugln!("[{:#04X}] math (opcode: {:#02X})", self.pc - 1, opcode);
         // 8-bit Arithmethic/Logic instructions
         match opcode {
             0x04 | 0x05 | 0x0C | 0x0D | 0x14 | 0x15 | 0x1C | 0x1D |
@@ -216,8 +239,8 @@ impl Cpu {
             0x80 ..= 0x8F |
             0x90 ..= 0x9F |
             0xA0 ..= 0xAF => panic!("not implemented"),
-            0xB0 ..= 0xBF => self.op_cp(opcode),
-            0xC6 | 0xD6 | 0xE6 | 0xF6 | 0xCE | 0xDE | 0xEE | 0xFE => panic!("not implemented!"),
+            0xB0 ..= 0xBF | 0xFE => self.op_cp(opcode),
+            0xC6 | 0xD6 | 0xE6 | 0xF6 | 0xCE | 0xDE | 0xEE => panic!("not implemented!"),
             _ => panic!("impossible opcode for 8bit math/logic: {:#02X}", opcode),
         }
         let cpu_cycles = if opcode == 0x34 || opcode == 0x35 {
@@ -232,13 +255,13 @@ impl Cpu {
 
     // compare the operand vs A, but don't store a result
     fn op_cp(&mut self, opcode: u8)  {
-        rog::debugln!("[{:#04X}] CP (op: {:#02X}", self.pc - 1, opcode);
+        rog::debugln!("[{:#04X}] CP (opcode: {:#02X})", self.pc - 1, opcode);
         let operand = match opcode {
             0xB8 ..= 0xBF => self.fetch_reg_operand(opcode),
             0xFE => self.fetch(),
             _ => panic!("invalid opcode for op_cp: {:#02X}", opcode),
         };
-        let result = self.a - operand;
+        let result = self.a.wrapping_sub(operand);
         self.set_flag(Flag::C, if self.a < operand { 1 } else { 0 });
         self.set_flag(Flag::N, 1);
         self.set_flag(Flag::H, if (self.a & 0x0F) < (operand & 0x0F) { 1 } else { 0 });
