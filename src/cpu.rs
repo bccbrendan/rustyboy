@@ -91,6 +91,15 @@ impl Cpu {
             0x40 ..= 0x7F |
             0xE0 | 0xE2 | 0xEA |
             0xF0 | 0xF2 | 0xF8 | 0xF9 | 0xFA => self.emulate_load_operation(opcode),
+            // 8-bit Arithmethic/Logic instructions
+            0x04 | 0x05 | 0x0C | 0x0D | 0x14 | 0x15 | 0x1C | 0x1D |
+            0x24 | 0x25 | 0x27 | 0x2C | 0x2D | 0x2F |
+            0x34 | 0x35 | 0x37 | 0x3C | 0x3D | 0x3F |
+            0x80 ..= 0x8F |
+            0x90 ..= 0x9F |
+            0xA0 ..= 0xAF |
+            0xB0 ..= 0xBF |
+            0xC6 | 0xD6 | 0xE6 | 0xF6 | 0xCE | 0xDE | 0xEE | 0xFE => self.emulate_8bit_arithmetic_or_logic(opcode),
             0x07 | 0x17 | 0x0F | 0x1F | 0xCB => self.emulate_8bit_rotation_or_shift(opcode),
             _ => panic!("Unrecognized opcode {:#02x} at addr {:#04x}", opcode, self.pc - 1),
         };
@@ -109,6 +118,43 @@ impl Cpu {
         self.pc += 2;
         w
     }
+
+    // based on https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html, this is true for many opcodes
+    fn fetch_reg_operand(&self, opcode: u8) -> u8 {
+        let operand = match opcode & 0x7 {
+            0x0 => self.b,
+            0x1 => self.c,
+            0x2 => self.d,
+            0x3 => self.e,
+            0x4 => self.h,
+            0x5 => self.l,
+            0x6 => {
+                let addr = (self.h as u16) << 8 | self.l as u16;
+                self.mmu.borrow().read8(addr)
+            },
+            0x7 => self.a,
+        };
+        operand
+    }
+
+    // based on https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html, this is true for many opcodes
+    fn store_result_in_register(&mut self, opcode: u8, result: u8) {
+        match opcode & 0x7 {
+            0x0 => self.b = result,
+            0x1 => self.c = result,
+            0x2 => self.d = result,
+            0x3 => self.e = result,
+            0x4 => self.h = result,
+            0x5 => self.l = result,
+            0x6 => {
+                let addr = (self.h as u16) << 8 | self.l as u16;
+                self.mmu.borrow_mut().write8(addr, result)
+            },
+            0x7 => self.a = result,
+            _ => panic!("impossible!"),
+        };
+    }
+ 
 
     fn emulate_jump_operation(&mut self, opcode: u8) -> u32 {
         match opcode {
@@ -161,6 +207,45 @@ impl Cpu {
         }
     }
 
+    fn emulate_8bit_arithmetic_or_logic(&mut self, opcode: u8) -> u32 {
+        // 8-bit Arithmethic/Logic instructions
+        match opcode {
+            0x04 | 0x05 | 0x0C | 0x0D | 0x14 | 0x15 | 0x1C | 0x1D |
+            0x24 | 0x25 | 0x27 | 0x2C | 0x2D | 0x2F |
+            0x34 | 0x35 | 0x37 | 0x3C | 0x3D | 0x3F |
+            0x80 ..= 0x8F |
+            0x90 ..= 0x9F |
+            0xA0 ..= 0xAF => panic!("not implemented"),
+            0xB0 ..= 0xBF => self.op_cp(opcode),
+            0xC6 | 0xD6 | 0xE6 | 0xF6 | 0xCE | 0xDE | 0xEE | 0xFE => panic!("not implemented!"),
+            _ => panic!("impossible opcode for 8bit math/logic: {:#02X}", opcode),
+        }
+        let cpu_cycles = if opcode == 0x34 || opcode == 0x35 {
+            12
+        } else if opcode & 0x07 == 0x06 {
+            8  // those that dereference HL
+        } else {
+            4
+        };
+        cpu_cycles
+    }
+
+    // compare the operand vs A, but don't store a result
+    fn op_cp(&mut self, opcode: u8)  {
+        rog::debugln!("[{:#04X}] CP (op: {:#02X}", self.pc - 1, opcode);
+        let operand = match opcode {
+            0xB8 ..= 0xBF => self.fetch_reg_operand(opcode),
+            0xFE => self.fetch(),
+            _ => panic!("invalid opcode for op_cp: {:#02X}", opcode),
+        };
+        let result = self.a - operand;
+        self.set_flag(Flag::C, if self.a < operand { 1 } else { 0 });
+        self.set_flag(Flag::N, 1);
+        self.set_flag(Flag::H, if (self.a & 0x0F) < (operand & 0x0F) { 1 } else { 0 });
+        self.set_flag(Flag::Z, if result == 0 { 1 } else { 0 });
+    }
+ 
+
     fn emulate_8bit_rotation_or_shift(&mut self, opcode: u8) -> u32 {
         match opcode {
             // RLCA RLA RRCA RRA 
@@ -182,20 +267,7 @@ impl Cpu {
             },
             0xCB => {
                 let cb_opcode = self.fetch();
-                let operand = match cb_opcode & 0x7 {
-                    0x0 => self.b,
-                    0x1 => self.c,
-                    0x2 => self.d,
-                    0x3 => self.e,
-                    0x4 => self.h,
-                    0x5 => self.l,
-                    0x6 => {
-                        let addr = (self.h as u16) << 8 | self.l as u16;
-                        self.mmu.borrow().read8(addr)
-                    },
-                    0x7 => self.a,
-                    _ => panic!("invalid cb_opcode? {:#02X}", cb_opcode),
-                };
+                let operand = self.fetch_reg_operand(cb_opcode);
                 let result = match cb_opcode {
                     // https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
                     0x00 ..= 0x07 => self.op_rlc(operand, true),
@@ -210,21 +282,7 @@ impl Cpu {
                     0x80 ..= 0xBF => self.op_res(operand, (cb_opcode - 0x80) >> 3),
                     0xC0 ..= 0xFF => self.op_set(operand, (cb_opcode - 0xC0) >> 3),
                 };
-                match cb_opcode & 0x7 {
-                    0x0 => self.b = result,
-                    0x1 => self.c = result,
-                    0x2 => self.d = result,
-                    0x3 => self.e = result,
-                    0x4 => self.h = result,
-                    0x5 => self.l = result,
-                    0x6 => {
-                        let addr = (self.h as u16) << 8 | self.l as u16;
-                        self.mmu.borrow_mut().write8(addr, result)
-                    },
-                    0x7 => self.a = result,
-                    _ => panic!("invalid cb_opcode? {:#02X}", cb_opcode),
-
-                }
+                self.store_result_in_register(cb_opcode, result);
                 let cpu_cycles = if cb_opcode & 0x7 == 0x6 { 16 } else { 8 };
                 cpu_cycles
             },
