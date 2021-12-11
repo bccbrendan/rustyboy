@@ -81,7 +81,7 @@ impl Cpu {
         // https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
         let cycles = match opcode {
             // CPU Control Instructions
-            0x00 => {rog::debugln!("[{:#04X}] NOP", self.pc - 1); 4},
+            0x00 => {rog::debugln!("[{:#06X}] NOP", self.pc - 1); 4},
             // Jump instructions
             0xC2 | 0xC3 | 0xCA | 0xD2 | 0xDA | 0xE9 | // jp 
             0x18 | 0x20 | 0x28 | 0x30 | 0x38 |  // jr
@@ -94,7 +94,12 @@ impl Cpu {
             0x32 | 0x36 | 0x3A | 0x3E |
             0x40 ..= 0x7F |
             0xE0 | 0xE2 | 0xEA |
-            0xF0 | 0xF2 | 0xF8 | 0xF9 | 0xFA => self.emulate_load_operation(opcode),
+            0xF0 | 0xF2 | 0xFA => self.emulate_8bit_load_operation(opcode),
+            // 16-bit ld/store/move ops
+            0x01 | 0x11 | 0x21 | 0x31 | 0x08 |
+            0xC1 | 0xD1 | 0xE1 | 0xF1 | 
+            0xC5 | 0xD5 | 0xE5 | 0xF5 | 
+            0xF8 | 0xF9 => self.emulate_16bit_load_operation(opcode), 
             // 8-bit Arithmethic/Logic instructions
             0x04 | 0x05 | 0x0C | 0x0D | 0x14 | 0x15 | 0x1C | 0x1D |
             0x24 | 0x25 | 0x27 | 0x2C | 0x2D | 0x2F |
@@ -159,7 +164,17 @@ impl Cpu {
             _ => panic!("impossible!"),
         };
     }
- 
+
+    fn push(&mut self, data: u8) {
+        self.sp = self.sp.wrapping_sub(1);
+        self.mmu.borrow_mut().write8(self.sp, data);
+    }
+
+    fn pop(&mut self) -> u8 {
+        let data = self.mmu.borrow().read8(self.sp);
+        self.sp = self.sp.wrapping_add(1);
+        data
+    }
 
     fn emulate_jump_operation(&mut self, opcode: u8) -> u32 {
         match opcode {
@@ -204,7 +219,7 @@ impl Cpu {
     }
 
 
-    fn emulate_load_operation(&mut self, opcode: u8) -> u32 {
+    fn emulate_8bit_load_operation(&mut self, opcode: u8) -> u32 {
         match opcode {
             0x02 | 0x06 | 0x08 | 0x0A | 0x0E |
             0x12 | 0x16 | 0x18 | 0x1A | 0x1E |
@@ -212,7 +227,7 @@ impl Cpu {
             0x32 | 0x36 | 0x38 | 0x3A | 0x3E |
             0x40 ..= 0x7F |
             0xE2 | 0xEA |
-            0xF2 | 0xF8 | 0xF9 | 0xFA => panic!("LD Not yet implemented: {:#02X}", opcode),
+            0xF2 | 0xF8 | 0xFA => panic!("LD Not yet implemented: {:#02X}", opcode),
             0xE0 => {
                 let n = self.fetch();
                 rog::debugln!("[{:#04X}] LD (FF00 + {:#02X}), A", self.pc - 2, n);
@@ -229,16 +244,130 @@ impl Cpu {
         }
     }
 
+    fn emulate_16bit_load_operation(&mut self, opcode: u8) -> u32 {
+        let cpu_cycles = match opcode {
+            0x01 => {
+                rog::debugln!("[{:#04X}] LD BC, d16", self.pc - 1);
+                let d16 = self.fetch16();
+                self.b  = (d16 >> 8) as u8;
+                self.c  = (d16 & 0xFF) as u8;
+                12
+            },
+            0x11 => {
+                rog::debugln!("[{:#04X}] LD DE, d16", self.pc - 1);
+                let d16 = self.fetch16();
+                self.d  = (d16 >> 8) as u8;
+                self.e  = (d16 & 0xFF) as u8;
+                12
+            },
+            0x21 => {
+                rog::debugln!("[{:#04X}] LD HL, d16", self.pc - 1);
+                let d16 = self.fetch16();
+                self.h  = (d16 >> 8) as u8;
+                self.l  = (d16 & 0xFF) as u8;
+                12
+            },
+            0x31 => {
+                rog::debugln!("[{:#04X}] LD SP, d16", self.pc - 1);
+                self.sp = self.fetch16();
+                12
+            },
+            0x08 => {
+                rog::debugln!("[{:#04X}] LD (a16),sp", self.pc - 1);
+                let a16 = self.fetch16();
+                self.mmu.borrow_mut().write16(a16, self.sp);
+                20
+            },
+            0xC1 => {
+                rog::debugln!("[{:#04X}] POP BC", self.pc - 1);
+                self.c = self.pop();
+                self.b = self.pop();
+                12
+            },
+            0xD1 => {
+                rog::debugln!("[{:#04X}] POP DE", self.pc - 1);
+                self.e = self.pop();
+                self.d = self.pop();
+                12
+            },
+            0xE1 => {
+                rog::debugln!("[{:#04X}] POP HL", self.pc - 1);
+                self.l = self.pop();
+                self.h = self.pop();
+                12
+            },
+            0xF1 => {
+                rog::debugln!("[{:#04X}] POP AF", self.pc - 1);
+                self.flags = self.pop();
+                self.a = self.pop();
+                12
+            },
+            0xC5 => {
+                rog::debugln!("[{:#04}] PUSH BC", self.pc - 1);
+                self.push(self.b);
+                self.push(self.c);
+                16
+            },
+            0xD5 => {
+                rog::debugln!("[{:#04}] PUSH DE", self.pc - 1);
+                self.push(self.d);
+                self.push(self.e);
+                16
+            },
+            0xE5 => {
+                rog::debugln!("[{:#04}] PUSH HL", self.pc - 1);
+                self.push(self.h);
+                self.push(self.l);
+                16
+            },
+            0xF5 => {
+                rog::debugln!("[{:#04}] PUSH AF", self.pc - 1);
+                self.push(self.a);
+                self.push(self.flags);
+                16
+            },
+            0xF8 => {
+                rog::debugln!("[{:#04X}] LD HL,SP+r8", self.pc - 1);
+                let addend = i16::from(self.fetch() as i8) as u16;
+                // carry flag set if overflow from bit 7
+                let c_flag = (self.sp & 0x00FF) + (addend & 0x00FF) > 0x00FF;
+                // half-carry flag set if overflow from bit 3
+                let h_flag = (self.sp & 0x000F) + (addend & 0x000F) > 0x000F;
+                let sum = self.sp.wrapping_add(addend);
+                self.h = (sum >> 8) as u8;
+                self.l = (sum & 0xFF) as u8;
+                self.set_flag(Flag::Z, 0);
+                self.set_flag(Flag::N, 0);
+                self.set_flag(Flag::H, if h_flag { 1 } else { 0 });
+                self.set_flag(Flag::C, if c_flag { 1 } else { 0 });
+                12
+            },
+            0xF9 => {
+                rog::debugln!("[{:#04X}] LD SP,HL", self.pc - 1);
+                let hl = (self.h as u16) << 8 | self.l as u16;
+                self.sp = hl;
+                8
+            },
+            _ => panic!("not implemented: {:#02X}", opcode),
+        };
+        cpu_cycles
+    }
+
     fn emulate_8bit_arithmetic_or_logic(&mut self, opcode: u8) -> u32 {
-        rog::debugln!("[{:#04X}] math (opcode: {:#02X})", self.pc - 1, opcode);
         // 8-bit Arithmethic/Logic instructions
         match opcode {
             0x04 | 0x05 | 0x0C | 0x0D | 0x14 | 0x15 | 0x1C | 0x1D |
-            0x24 | 0x25 | 0x27 | 0x2C | 0x2D | 0x2F |
+            0x24 | 0x25 | 0x27 | 0x2C | 0x2D => panic!("not implemented {:#02X}", opcode),
+            0x2F => {  // CPL
+                rog::debugln!("[{:#04X}] CPL", self.pc - 1);
+                self.a = !self.a;
+                self.set_flag(Flag::N, 1);
+                self.set_flag(Flag::H, 1);
+            },
             0x34 | 0x35 | 0x37 | 0x3C | 0x3D | 0x3F |
             0x80 ..= 0x8F |
             0x90 ..= 0x9F |
-            0xA0 ..= 0xAF => panic!("not implemented"),
+            0xA0 ..= 0xAF => panic!("not implemented {:#02X}", opcode),
             0xB0 ..= 0xBF | 0xFE => self.op_cp(opcode),
             0xC6 | 0xD6 | 0xE6 | 0xF6 | 0xCE | 0xDE | 0xEE => panic!("not implemented!"),
             _ => panic!("impossible opcode for 8bit math/logic: {:#02X}", opcode),
