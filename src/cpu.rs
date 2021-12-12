@@ -356,15 +356,17 @@ impl Cpu {
     fn emulate_8bit_arithmetic_or_logic(&mut self, opcode: u8) -> u32 {
         // 8-bit Arithmethic/Logic instructions
         match opcode {
-            0x04 | 0x05 | 0x0C | 0x0D | 0x14 | 0x15 | 0x1C | 0x1D |
-            0x24 | 0x25 | 0x27 | 0x2C | 0x2D => panic!("not implemented {:#02X}", opcode),
+            0x04 | 0x05 | 0x0C | 0x0D |
+            0x14 | 0x15 | 0x1C | 0x1D |
+            0x24 | 0x25 | 0x2C | 0x2D |
+            0x34 | 0x35 | 0x3C | 0x3D => self.op_inc_or_dec(opcode),
             0x2F => {  // CPL
                 rog::debugln!("[{:#04X}] CPL", self.pc - 1);
                 self.a = !self.a;
                 self.set_flag(Flag::N, 1);
                 self.set_flag(Flag::H, 1);
             },
-            0x34 | 0x35 | 0x37 | 0x3C | 0x3D | 0x3F |
+            0x27 | 0x37 | 0x3F |
             0x80 ..= 0x8F |
             0x90 ..= 0x9F |
             0xA0 ..= 0xAF => panic!("not implemented {:#02X}", opcode),
@@ -381,6 +383,45 @@ impl Cpu {
         };
         cpu_cycles
     }
+
+    fn op_inc_or_dec(&mut self, opcode: u8) {
+        let (operand, operand_name) = match opcode {
+            0x04 | 0x05 => (self.b, "B"),
+            0x0C | 0x0D => (self.c, "C"),
+            0x14 | 0x15 => (self.d, "D"),
+            0x1C | 0x1D => (self.e, "E"),
+            0x24 | 0x25 => (self.h, "H"),
+            0x2C | 0x2D => (self.l, "L"),
+            0x34 | 0x35 => (self.mmu.borrow().read8((self.h as u16) << 8 | self.l as u16), "(HL)"),
+            0x3C | 0x3D => (self.a, "A"),
+            _ => panic!("impossible opcode: {:#02X}!", opcode),
+        };
+        let (result, operation_name) = if opcode & 0x01 == 0x00 {
+            // INC
+            self.set_flag(Flag::H, if operand & 0x07 == 0x07 { 1 } else { 0 });
+            self.set_flag(Flag::N, 0);
+            (operand.wrapping_add(1), "INC")
+        } else {
+            // "DEC "
+            self.set_flag(Flag::H, if operand & 0x07 == 0x00 { 1 } else { 0 });
+            self.set_flag(Flag::N, 1);
+            (operand.wrapping_sub(1), "DEC")
+        };
+        self.set_flag(Flag::Z, if result == 0x00 { 1 } else { 0 });
+        match opcode {
+            0x04 | 0x05 => self.b = result,
+            0x0C | 0x0D => self.c = result,
+            0x14 | 0x15 => self.d = result,
+            0x1C | 0x1D => self.e = result,
+            0x24 | 0x25 => self.h = result,
+            0x2C | 0x2D => self.l = result,
+            0x34 | 0x35 => self.mmu.borrow_mut().write8((self.h as u16) << 8 | self.l as u16, result),
+            0x3C | 0x3D => self.a = result,
+            _ => panic!("impossible opcode: {:#02X}!", opcode),
+        }
+        rog::debugln!("[{:#04X}] {} {}", self.pc - 1, operation_name, operand_name);
+    }
+
 
     // compare the operand vs A, but don't store a result
     fn op_cp(&mut self, opcode: u8)  {
