@@ -2,6 +2,44 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use super::memory::Memory;
 
+const OP_MNEMONICS: [&str; 256] = [
+    "NOP", "LD BC,d16", "LD (BC),A", "INC BC", "INC B", "DEC B", "LD B,d8", "RLCA", "LD (a16),SP", "ADD HL,BC", "LD A,(BC)", "DEC BC", "INC C", "DEC C", "LD C,d8", "RRCA",
+    "STOP 0", "LD DE,d16", "LD (DE),A", "INC DE", "INC D", "DEC D", "LD D,d8", "RLA", "JR r8", "ADD HL,DE", "LD A,(DE)", "DEC DE", "INC E", "DEC E", "LD E,d8", "RRA",
+    "JR NZ,r8", "LD HL,d16", "LD (HL+),A", "INC HL", "INC H", "DEC H", "LD H,d8", "DAA", "JR Z,r8", "ADD HL,HL", "LD A,(HL+)", "DEC HL", "INC L", "DEC L", "LD L,d8", "CPL",
+    "JR NC,r8", "LD SP,d16", "LD (HL-),A", "INC SP", "INC (HL)", "DEC (HL)", "LD (HL),d8", "SCF", "JR C,r8", "ADD HL,SP", "LD A,(HL-)", "DEC SP", "INC A", "DEC A", "LD A,d8", "CCF",
+    "LD B,B", "LD B,C", "LD B,D", "LD B,E", "LD B,H", "LD B,L", "LD B,(HL)", "LD B,A", "LD C,B", "LD C,C", "LD C,D", "LD C,E", "LD C,H", "LD C,L", "LD C,(HL)", "LD C,A",
+    "LD D,B", "LD D,C", "LD D,D", "LD D,E", "LD D,H", "LD D,L", "LD D,(HL)", "LD D,A", "LD E,B", "LD E,C", "LD E,D", "LD E,E", "LD E,H", "LD E,L", "LD E,(HL)", "LD E,A",
+    "LD H,B", "LD H,C", "LD H,D", "LD H,E", "LD H,H", "LD H,L", "LD H,(HL)", "LD H,A", "LD L,B", "LD L,C", "LD L,D", "LD L,E", "LD L,H", "LD L,L", "LD L,(HL)", "LD L,A",
+    "LD (HL),B", "LD (HL),C", "LD (HL),D", "LD (HL),E", "LD (HL),H", "LD (HL),L", "HALT", "LD (HL),A", "LD A,B", "LD A,C", "LD A,D", "LD A,E", "LD A,H", "LD A,L", "LD A,(HL)", "LD A,A",
+    "ADD A,B", "ADD A,C", "ADD A,D", "ADD A,E", "ADD A,H", "ADD A,L", "ADD A,(HL)", "ADD A,A", "ADC A,B", "ADC A,C", "ADC A,D", "ADC A,E", "ADC A,H", "ADC A,L", "ADC A,(HL)", "ADC A,A",
+    "SUB B", "SUB C", "SUB D", "SUB E", "SUB H", "SUB L", "SUB (HL)", "SUB A", "SBC A,B", "SBC A,C", "SBC A,D", "SBC A,E", "SBC A,H", "SBC A,L", "SBC A,(HL)", "SBC A,A",
+    "AND B", "AND C", "AND D", "AND E", "AND H", "AND L", "AND (HL)", "AND A", "XOR B", "XOR C", "XOR D", "XOR E", "XOR H", "XOR L", "XOR (HL)", "XOR A",
+    "OR B", "OR C", "OR D", "OR E", "OR H", "OR L", "OR (HL)", "OR A", "CP B", "CP C", "CP D", "CP E", "CP H", "CP L", "CP (HL)", "CP A",
+    "RET NZ", "POP BC", "JP NZ,a16", "JP a16", "CALL NZ,a16", "PUSH BC", "ADD A,d8", "RST 00H", "RET Z", "RET", "JP Z,a16", "PREFIX CB", "CALL Z,a16", "CALL a16", "ADC A,d8", "RST 08H",
+    "RET NC", "POP DE", "JP NC,a16", "UNKNOWN", "CALL NC,a16", "PUSH DE", "SUB d8", "RST 10H", "RET C", "RETI", "JP C,a16", " UNKNOWN", "CALL C,a16", "UNKNOWN", "SBC A,d8", "RST 18H",
+    "LDH (a8),A", "POP HL", "LD (C),A", "UNKNOWN", "UNKNOWN", "PUSH HL", "AND d8", "RST 20H", "ADD SP,r8", "JP (HL)", "LD (a16),A", "UNKNOWN", "UNKNOWN", "UNKNOWN", "XOR d8", "RST 28H",
+    "LDH A,(a8)", "POP AF", "LD A,(C)", "DI", "UNKNOWN", "PUSH AF", "OR d8", "RST 30H", "LD HL,SP+r8", "LD SP,HL", "LD A,(a16)", "EI", "UNKNOWN", "UNKNOWN", "CP d8", "RST 38H",
+];
+
+const OP_CB_MNEMONICS: [&str; 256] = [
+    "RLC B", "RLC C", "RLC D", "RLC E", "RLC H", "RLC L", "RLC (HL)", "RLC A", "RRC B", "RRC C", "RRC D", "RRC E", "RRC H", "RRC L", "RRC (HL)", "RRC A",
+    "RL B", "RL C", "RL D", "RL E", "RL H", "RL L", "RL (HL)", "RL A", "RR B", "RR C", "RR D", "RR E", "RR H", "RR L", "RR (HL)", "RR A",
+    "SLA B", "SLA C", "SLA D", "SLA E", "SLA H", "SLA L", "SLA (HL)", "SLA A", "SRA B", "SRA C", "SRA D", "SRA E", "SRA H", "SRA L", "SRA (HL)", "SRA A",
+    "SWAP B", "SWAP C", "SWAP D", "SWAP E", "SWAP H", "SWAP L", "SWAP (HL)", "SWAP A", "SRL B", "SRL C", "SRL D", "SRL E", "SRL H", "SRL L", "SRL (HL)", "SRL A",
+    "BIT 0,B", "BIT 0,C", "BIT 0,D", "BIT 0,E", "BIT 0,H", "BIT 0,L", "BIT 0,(HL)", "BIT 0,A", "BIT 1,B", "BIT 1,C", "BIT 1,D", "BIT 1,E", "BIT 1,H", "BIT 1,L", "BIT 1,(HL)", "BIT 1,A",
+    "BIT 2,B", "BIT 2,C", "BIT 2,D", "BIT 2,E", "BIT 2,H", "BIT 2,L", "BIT 2,(HL)", "BIT 2,A", "BIT 3,B", "BIT 3,C", "BIT 3,D", "BIT 3,E", "BIT 3,H", "BIT 3,L", "BIT 3,(HL)", "BIT 3,A",
+    "BIT 4,B", "BIT 4,C", "BIT 4,D", "BIT 4,E", "BIT 4,H", "BIT 4,L", "BIT 4,(HL)", "BIT 4,A", "BIT 5,B", "BIT 5,C", "BIT 5,D", "BIT 5,E", "BIT 5,H", "BIT 5,L", "BIT 5,(HL)", "BIT 5,A",
+    "BIT 6,B", "BIT 6,C", "BIT 6,D", "BIT 6,E", "BIT 6,H", "BIT 6,L", "BIT 6,(HL)", "BIT 6,A", "BIT 7,B", "BIT 7,C", "BIT 7,D", "BIT 7,E", "BIT 7,H", "BIT 7,L", "BIT 7,(HL)", "BIT 7,A",
+    "RES 0,B", "RES 0,C", "RES 0,D", "RES 0,E", "RES 0,H", "RES 0,L", "RES 0,(HL)", "RES 0,A", "RES 1,B", "RES 1,C", "RES 1,D", "RES 1,E", "RES 1,H", "RES 1,L", "RES 1,(HL)", "RES 1,A",
+    "RES 2,B", "RES 2,C", "RES 2,D", "RES 2,E", "RES 2,H", "RES 2,L", "RES 2,(HL)", "RES 2,A", "RES 3,B", "RES 3,C", "RES 3,D", "RES 3,E", "RES 3,H", "RES 3,L", "RES 3,(HL)", "RES 3,A",
+    "RES 4,B", "RES 4,C", "RES 4,D", "RES 4,E", "RES 4,H", "RES 4,L", "RES 4,(HL)", "RES 4,A", "RES 5,B", "RES 5,C", "RES 5,D", "RES 5,E", "RES 5,H", "RES 5,L", "RES 5,(HL)", "RES 5,A",
+    "RES 6,B", "RES 6,C", "RES 6,D", "RES 6,E", "RES 6,H", "RES 6,L", "RES 6,(HL)", "RES 6,A", "RES 7,B", "RES 7,C", "RES 7,D", "RES 7,E", "RES 7,H", "RES 7,L", "RES 7,(HL)", "RES 7,A",
+    "SET 0,B", "SET 0,C", "SET 0,D", "SET 0,E", "SET 0,H", "SET 0,L", "SET 0,(HL)", "SET 0,A", "SET 1,B", "SET 1,C", "SET 1,D", "SET 1,E", "SET 1,H", "SET 1,L", "SET 1,(HL)", "SET 1,A",
+    "SET 2,B", "SET 2,C", "SET 2,D", "SET 2,E", "SET 2,H", "SET 2,L", "SET 2,(HL)", "SET 2,A", "SET 3,B", "SET 3,C", "SET 3,D", "SET 3,E", "SET 3,H", "SET 3,L", "SET 3,(HL)", "SET 3,A",
+    "SET 4,B", "SET 4,C", "SET 4,D", "SET 4,E", "SET 4,H", "SET 4,L", "SET 4,(HL)", "SET 4,A", "SET 5,B", "SET 5,C", "SET 5,D", "SET 5,E", "SET 5,H", "SET 5,L", "SET 5,(HL)", "SET 5,A",
+    "SET 6,B", "SET 6,C", "SET 6,D", "SET 6,E", "SET 6,H", "SET 6,L", "SET 6,(HL)", "SET 6,A", "SET 7,B", "SET 7,C", "SET 7,D", "SET 7,E", "SET 7,H", "SET 7,L", "SET 7,(HL)", "SET 7,A",
+];
+
 // https://gbdev.io/pandocs/CPU_Registers_and_Flags.html
 #[derive(Copy, Clone)]
 pub enum Flag {
@@ -78,10 +116,13 @@ impl Cpu {
 
     pub fn emulate_operation(&mut self) -> u32{
         let opcode = self.fetch();
+        if opcode != 0xCB {
+            rog::debugln!("[{:#04X}] {:#04X} | {}", self.pc.wrapping_sub(1), opcode, OP_MNEMONICS[opcode as usize]);
+        }
         // https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
         let cycles = match opcode {
             // CPU Control Instructions
-            0x00 => {rog::debugln!("[{:#06X}] NOP", self.pc - 1); 4},
+            0x00 => 4, // NOP
             // Jump instructions
             0xC2 | 0xC3 | 0xCA | 0xD2 | 0xDA | 0xE9 | // jp 
             0x18 | 0x20 | 0x28 | 0x30 | 0x38 |  // jr
@@ -181,7 +222,6 @@ impl Cpu {
             0xC2 => panic!("unimplemented!"),
             0xC3 => { // jp
                 let target = self.fetch16();
-                rog::debugln!("[{:#04X}] JP {:#04X}", self.pc - 3, target);
                 self.pc = target;
                 16
             },
@@ -190,7 +230,6 @@ impl Cpu {
             0xC4 | 0xCC => panic!("unimplemented opcode: {:#02x}", opcode),
             0xCD => { // call
                 let target = self.fetch16();
-                rog::debugln!("[{:#02X}] CALL {:#04X}", self.pc - 3, target);
                 self.sp = self.sp - 2;
                 self.mmu.borrow_mut().write16(self.sp, self.pc);
                 self.pc = target;
@@ -204,7 +243,6 @@ impl Cpu {
     // jump conditionally
     fn op_jr(&mut self, opcode: u8) -> u32 {
         let target = self.pc + u16::from(self.fetch());
-        rog::debugln!("[{:#04X}] JR {:#04X}", self.pc - 2, target);
         let taken = opcode == 0x18 ||
             (opcode == 0x20 && !self.is_set(Flag::Z)) ||
             (opcode == 0x28 && self.is_set(Flag::Z)) ||
@@ -230,13 +268,11 @@ impl Cpu {
             0xF2 | 0xF8 | 0xFA => panic!("LD Not yet implemented: {:#02X}", opcode),
             0xE0 => {
                 let n = self.fetch();
-                rog::debugln!("[{:#04X}] LD (FF00 + {:#02X}), A", self.pc - 2, n);
                 self.mmu.borrow_mut().write8(0xFF00 + n as u16, self.a);
                 12
             }
             0xF0 => {
                 let n = self.fetch();
-                rog::debugln!("[{:#04X}] LD A, 0xFF00+{:#02X}", self.pc - 2, n);
                 self.a = self.mmu.borrow().read8(0xFF00 + n as u16);
                 12
             }
@@ -247,87 +283,73 @@ impl Cpu {
     fn emulate_16bit_load_operation(&mut self, opcode: u8) -> u32 {
         let cpu_cycles = match opcode {
             0x01 => {
-                rog::debugln!("[{:#04X}] LD BC, d16", self.pc - 1);
                 let d16 = self.fetch16();
                 self.b  = (d16 >> 8) as u8;
                 self.c  = (d16 & 0xFF) as u8;
                 12
             },
             0x11 => {
-                rog::debugln!("[{:#04X}] LD DE, d16", self.pc - 1);
                 let d16 = self.fetch16();
                 self.d  = (d16 >> 8) as u8;
                 self.e  = (d16 & 0xFF) as u8;
                 12
             },
             0x21 => {
-                rog::debugln!("[{:#04X}] LD HL, d16", self.pc - 1);
                 let d16 = self.fetch16();
                 self.h  = (d16 >> 8) as u8;
                 self.l  = (d16 & 0xFF) as u8;
                 12
             },
             0x31 => {
-                rog::debugln!("[{:#04X}] LD SP, d16", self.pc - 1);
                 self.sp = self.fetch16();
                 12
             },
             0x08 => {
-                rog::debugln!("[{:#04X}] LD (a16),sp", self.pc - 1);
                 let a16 = self.fetch16();
                 self.mmu.borrow_mut().write16(a16, self.sp);
                 20
             },
             0xC1 => {
-                rog::debugln!("[{:#04X}] POP BC", self.pc - 1);
                 self.c = self.pop();
                 self.b = self.pop();
                 12
             },
             0xD1 => {
-                rog::debugln!("[{:#04X}] POP DE", self.pc - 1);
                 self.e = self.pop();
                 self.d = self.pop();
                 12
             },
             0xE1 => {
-                rog::debugln!("[{:#04X}] POP HL", self.pc - 1);
                 self.l = self.pop();
                 self.h = self.pop();
                 12
             },
             0xF1 => {
-                rog::debugln!("[{:#04X}] POP AF", self.pc - 1);
                 self.flags = self.pop();
                 self.a = self.pop();
                 12
             },
             0xC5 => {
-                rog::debugln!("[{:#04}] PUSH BC", self.pc - 1);
                 self.push(self.b);
                 self.push(self.c);
                 16
             },
             0xD5 => {
-                rog::debugln!("[{:#04}] PUSH DE", self.pc - 1);
                 self.push(self.d);
                 self.push(self.e);
                 16
             },
             0xE5 => {
-                rog::debugln!("[{:#04}] PUSH HL", self.pc - 1);
                 self.push(self.h);
                 self.push(self.l);
                 16
             },
             0xF5 => {
-                rog::debugln!("[{:#04}] PUSH AF", self.pc - 1);
                 self.push(self.a);
                 self.push(self.flags);
                 16
             },
             0xF8 => {
-                rog::debugln!("[{:#04X}] LD HL,SP+r8", self.pc - 1);
                 let addend = i16::from(self.fetch() as i8) as u16;
                 // carry flag set if overflow from bit 7
                 let c_flag = (self.sp & 0x00FF) + (addend & 0x00FF) > 0x00FF;
@@ -343,7 +365,6 @@ impl Cpu {
                 12
             },
             0xF9 => {
-                rog::debugln!("[{:#04X}] LD SP,HL", self.pc - 1);
                 let hl = (self.h as u16) << 8 | self.l as u16;
                 self.sp = hl;
                 8
@@ -361,7 +382,6 @@ impl Cpu {
             0x24 | 0x25 | 0x2C | 0x2D |
             0x34 | 0x35 | 0x3C | 0x3D => self.op_inc_or_dec(opcode),
             0x2F => {  // CPL
-                rog::debugln!("[{:#04X}] CPL", self.pc - 1);
                 self.a = !self.a;
                 self.set_flag(Flag::N, 1);
                 self.set_flag(Flag::H, 1);
@@ -385,27 +405,27 @@ impl Cpu {
     }
 
     fn op_inc_or_dec(&mut self, opcode: u8) {
-        let (operand, operand_name) = match opcode {
-            0x04 | 0x05 => (self.b, "B"),
-            0x0C | 0x0D => (self.c, "C"),
-            0x14 | 0x15 => (self.d, "D"),
-            0x1C | 0x1D => (self.e, "E"),
-            0x24 | 0x25 => (self.h, "H"),
-            0x2C | 0x2D => (self.l, "L"),
-            0x34 | 0x35 => (self.mmu.borrow().read8((self.h as u16) << 8 | self.l as u16), "(HL)"),
-            0x3C | 0x3D => (self.a, "A"),
+        let operand = match opcode {
+            0x04 | 0x05 => self.b,
+            0x0C | 0x0D => self.c,
+            0x14 | 0x15 => self.d,
+            0x1C | 0x1D => self.e,
+            0x24 | 0x25 => self.h,
+            0x2C | 0x2D => self.l,
+            0x34 | 0x35 => self.mmu.borrow().read8((self.h as u16) << 8 | self.l as u16),
+            0x3C | 0x3D => self.a,
             _ => panic!("impossible opcode: {:#02X}!", opcode),
         };
-        let (result, operation_name) = if opcode & 0x01 == 0x00 {
+        let result = if opcode & 0x01 == 0x00 {
             // INC
             self.set_flag(Flag::H, if operand & 0x07 == 0x07 { 1 } else { 0 });
             self.set_flag(Flag::N, 0);
-            (operand.wrapping_add(1), "INC")
+            operand.wrapping_add(1)
         } else {
             // "DEC "
             self.set_flag(Flag::H, if operand & 0x07 == 0x00 { 1 } else { 0 });
             self.set_flag(Flag::N, 1);
-            (operand.wrapping_sub(1), "DEC")
+            operand.wrapping_sub(1)
         };
         self.set_flag(Flag::Z, if result == 0x00 { 1 } else { 0 });
         match opcode {
@@ -419,13 +439,11 @@ impl Cpu {
             0x3C | 0x3D => self.a = result,
             _ => panic!("impossible opcode: {:#02X}!", opcode),
         }
-        rog::debugln!("[{:#04X}] {} {}", self.pc - 1, operation_name, operand_name);
     }
 
 
     // compare the operand vs A, but don't store a result
     fn op_cp(&mut self, opcode: u8)  {
-        rog::debugln!("[{:#04X}] CP (opcode: {:#02X})", self.pc - 1, opcode);
         let operand = match opcode {
             0xB8 ..= 0xBF => self.fetch_reg_operand(opcode),
             0xFE => self.fetch(),
@@ -460,6 +478,7 @@ impl Cpu {
             },
             0xCB => {
                 let cb_opcode = self.fetch();
+                rog::debugln!("[{:#06X}] {:#04X}{:02X} | {}", self.pc.wrapping_sub(2), opcode, cb_opcode, OP_CB_MNEMONICS[cb_opcode as usize]);
                 let operand = self.fetch_reg_operand(cb_opcode);
                 let result = match cb_opcode {
                     // https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
@@ -485,7 +504,6 @@ impl Cpu {
 
     // preform a rotate-logical through carry with the given register value. bit 7 becomes the new carry bit.
     fn op_rlc(&mut self, operand: u8, is_cb_prefixed: bool) -> u8 {
-        rog::debugln!("[{:#04X}] RLC {:#02X}", self.pc - if is_cb_prefixed {2} else {1}, operand);
         let carry_bit = operand >> 7;
         self.set_flag(Flag::C, carry_bit);
         let new_val = operand << 1 | carry_bit;
@@ -494,14 +512,12 @@ impl Cpu {
                 true => match new_val { 0 => 1, _ => 0, },
                 false => 0,
             });
-        rog::debugln!("    new_val: {:#02X}", new_val);
         new_val
     }
 
     // Rotate register right.
     // [0] -> [7 -> 0] -> C
     fn op_rrc(&mut self, operand: u8, is_cb_prefixed: bool) -> u8 {
-        rog::debugln!("[{:#04X}] RRC {:#02X}", self.pc - if is_cb_prefixed {2} else {1}, operand);
         let carry_bit = operand & 0x01;
         let new_val = (carry_bit << 7) | (operand >> 1);
         self.set_flag(Flag::C, carry_bit);
@@ -510,13 +526,11 @@ impl Cpu {
                 true => match new_val { 0 => 1, _ => 0, },
                 false => 0,
             });
-        rog::debugln!("    new_val: {:#02X}", new_val);
         new_val
     }
 
     // C <- [7 <- 0] <- C
     fn op_rl(&mut self, operand: u8, is_cb_prefixed: bool) -> u8 {
-        rog::debugln!("[{:#04X}] RL {:#02X}", self.pc - if is_cb_prefixed {2} else {1}, operand);
         let c = if self.flags & Flag::C as u8 != 0 { 0x1 } else { 0x0 };
         let new_val = (operand << 1) | c;
         self.set_flag(Flag::C, operand >> 7);
@@ -532,7 +546,6 @@ impl Cpu {
     // rotate register through carry
     // C -> [7 -> 0] -> C
     fn op_rr(&mut self, operand: u8, is_cb_prefixed: bool) -> u8 {
-        rog::debugln!("[{:#04X}] RR {:#02X}", self.pc - if is_cb_prefixed {2} else {1}, operand);
         let c = if self.flags & Flag::C as u8 != 0 { 0x1 } else { 0x0 };
         let new_val = (c << 7) | (operand >> 1) ;
         self.set_flag(Flag::C, operand & 0x01);
@@ -605,7 +618,4 @@ impl Cpu {
         let result = operand | 1 << index;
         result
     }
-
-
-
 }
