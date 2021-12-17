@@ -159,13 +159,13 @@ impl Cpu {
 
     fn fetch(&mut self) -> u8 {
         let b = self.mmu.borrow().read8(self.pc);
-        self.pc += 1;
+        self.pc = self.pc.wrapping_add(1);
         b
     }
 
     fn fetch16(&mut self) -> u16 {
         let w = self.mmu.borrow().read16(self.pc);
-        self.pc += 2;
+        self.pc = self.pc.wrapping_add(2);
         w
     }
 
@@ -242,7 +242,9 @@ impl Cpu {
 
     // jump conditionally
     fn op_jr(&mut self, opcode: u8) -> u32 {
-        let target = self.pc + u16::from(self.fetch());
+        let r8 = self.fetch() as i8;
+        let target = self.pc.wrapping_add(r8 as u16);
+        rog::debugln!("              | r8={}", r8); 
         let taken = opcode == 0x18 ||
             (opcode == 0x20 && !self.is_set(Flag::Z)) ||
             (opcode == 0x28 && self.is_set(Flag::Z)) ||
@@ -268,12 +270,14 @@ impl Cpu {
             0xF2 | 0xF8 | 0xFA => panic!("LD Not yet implemented: {:#02X}", opcode),
             0xE0 => {
                 let n = self.fetch();
-                self.mmu.borrow_mut().write8(0xFF00 + n as u16, self.a);
+                self.mmu.borrow_mut().write8((n as u16).wrapping_add(0xFF00), self.a);
                 12
             }
             0xF0 => {
                 let n = self.fetch();
-                self.a = self.mmu.borrow().read8(0xFF00 + n as u16);
+                let addr = (n as u16).wrapping_add(0xFF00);
+                self.a = self.mmu.borrow().read8(addr);
+                rog::debugln!("                      ({:#04X})", addr);
                 12
             }
             _ => panic!("Unsupported LD opcode: {:#02X}", opcode),

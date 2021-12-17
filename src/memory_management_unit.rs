@@ -45,6 +45,7 @@ impl MemoryManagementUnit {
     pub fn run_cycles(&mut self, cpu_clock_cycles: u32) {
         // TODO run cycles on components, let them drive interrupts to each other.
         // This is done in small pieces from the main_board, so no need to break up cpu_clock_cycles
+        self.gpu.run_cycles(cpu_clock_cycles);
     }
 }
 
