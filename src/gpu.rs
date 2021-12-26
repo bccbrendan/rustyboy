@@ -1,6 +1,7 @@
 use std::{rc::Rc, cell::RefCell};
 use super::interrupts::Interrupts;
 use super::memory::Memory;
+use super::palette::PaletteData;
 
 pub const WIDTH: usize = 160;
 pub const HEIGHT: usize = 144;
@@ -21,7 +22,6 @@ fn will_enter_vblank(current_dot: usize, cycles_to_run: usize) -> bool {
     return current_dot < DOTS_BEFORE_VBLANK && ((current_dot + cycles_to_run) >= DOTS_BEFORE_VBLANK);
 }
 
-
 pub struct Gpu {
     pub interrupts: Rc<RefCell<Interrupts>>,
     // https://gbdev.io/pandocs/Scrolling.html
@@ -33,8 +33,9 @@ pub struct Gpu {
     scroll_x: u8,
     lcd_y_coordinate: u8,
     ly_compare: u8,
-    obj_palette_0_data: u8,
-    obj_palette_1_data: u8,
+    background_palette: PaletteData,
+    obj_palette_0: PaletteData,
+    obj_palette_1: PaletteData,
     window_pos_y: u8,
     window_pos_x: u8,
 }
@@ -51,8 +52,9 @@ impl Gpu {
             scroll_x: 0x00,
             lcd_y_coordinate: 0x00,
             ly_compare: 0x00,
-            obj_palette_0_data: 0xFF,
-            obj_palette_1_data: 0xFF,
+            background_palette: PaletteData::init(0x00),
+            obj_palette_0: PaletteData::init(0x00),
+            obj_palette_1: PaletteData::init(0x00),
             window_pos_y: 0,
             window_pos_x: 0,
         }
@@ -100,8 +102,9 @@ impl Memory for Gpu {
             0xFF43 => self.scroll_x,
             0xFF44 => self.lcd_y_coordinate,
             0xFF45 => self.ly_compare,
-            0xFF48 => self.obj_palette_0_data,
-            0xFF49 => self.obj_palette_1_data,
+            0xFF47 => self.background_palette.read(),
+            0xFF48 => self.obj_palette_0.read(),
+            0xFF49 => self.obj_palette_1.read(),
             0xFF4A => self.window_pos_y,
             0xFF4B => self.window_pos_x,
             _ => panic!("unimplemented address read on Gpu {:#04x}", addr)
@@ -116,8 +119,9 @@ impl Memory for Gpu {
             0xFF43 => self.scroll_x = data,
             0xFF44 => self.lcd_y_coordinate = 0x00,
             0xFF45 => self.ly_compare = data,
-            0xFF48 => self.obj_palette_0_data = data,
-            0xFF49 => self.obj_palette_1_data = data,
+            0xFF47 => self.background_palette = PaletteData::init(data),
+            0xFF48 => self.obj_palette_0 = PaletteData::init(data),
+            0xFF49 => self.obj_palette_1 = PaletteData::init(data),
             0xFF4A => self.window_pos_y = data,
             0xFF4B => self.window_pos_x = data,
             _ => panic!("unimplemented address write on Gpu {:#04x}", addr)

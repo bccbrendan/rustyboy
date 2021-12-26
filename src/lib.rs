@@ -1,6 +1,7 @@
 pub mod apu;
 pub mod cartridge;
 pub mod cpu;
+pub mod palette;
 pub mod gpu;
 pub mod interrupts;
 pub mod joypad;
