@@ -19,8 +19,9 @@ pub struct MemoryManagementUnit {
     pub timer: Timer,
     interrupts: Rc<RefCell<Interrupts>>,
     // hdma,
+    pub work_ram_c000: [u8; 4096],  //wram
+    pub work_ram_d000: [u8; 4096],  //wram
     pub hram: [u8; 128],// hram,
-    // wram,
     interrupt_enable: u8,
 }
 
@@ -36,6 +37,8 @@ impl MemoryManagementUnit {
             serial_cable: SerialCable::init(interrupts.clone()),
             timer: Timer::init(interrupts.clone()),
             interrupts: interrupts.clone(),
+            work_ram_c000: [0x0; 4096],
+            work_ram_d000: [0x0; 4096],
             hram: [0x0; 128],
             interrupt_enable: 0x00,
         };
@@ -52,7 +55,12 @@ impl MemoryManagementUnit {
 impl Memory for MemoryManagementUnit {
     fn read8(&self, addr: u16) -> u8 {
         match addr {
-            0x0000..=0x7fff => self.cartridge.read8(addr),
+            0x0000 ..= 0x7FFF => self.cartridge.read8(addr),
+            0xC000 ..= 0xCFFF => self.work_ram_c000[(addr - 0xC000) as usize],
+            0xD000 ..= 0xDFFF => self.work_ram_d000[(addr - 0xD000) as usize],
+            // Mirror of C000-DDFF
+            0xE000 ..= 0xEFFF => self.work_ram_c000[(addr - 0xE000) as usize],
+            0xF000 ..= 0xFDFF => self.work_ram_d000[(addr - 0xF000) as usize],
             0xFF00 => self.joypad.read8(addr),
             0xFF01 | 0xFF02 => self.serial_cable.read8(addr),
             0xFF04 ..= 0xFF07 => self.timer.read8(addr),
@@ -73,6 +81,11 @@ impl Memory for MemoryManagementUnit {
     fn write8(&mut self, addr: u16, data: u8) {
         match addr {
             0x0000..=0x7fff => self.cartridge.write8(addr, data),
+            0xC000 ..= 0xCFFF => { self.work_ram_c000[(addr - 0xC000) as usize] = data },
+            0xD000 ..= 0xDFFF => { self.work_ram_d000[(addr - 0xD000) as usize] = data },
+            // Mirror of C000-DDFF
+            0xE000 ..= 0xEFFF => { self.work_ram_c000[(addr - 0xE000) as usize] = data },
+            0xF000 ..= 0xFDFF => { self.work_ram_d000[(addr - 0xF000) as usize] = data },
             0xFF00 => self.joypad.write8(addr, data),
             0xFF01 | 0xFF02 => self.serial_cable.write8(addr, data),
             0xFF04 ..= 0xFF07 => self.timer.write8(addr, data),
