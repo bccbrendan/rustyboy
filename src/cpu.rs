@@ -217,6 +217,17 @@ impl Cpu {
         data
     }
 
+    fn push16(&mut self, data: u16) {
+        self.sp.wrapping_sub(2);
+        self.mmu.borrow_mut().write16(self.sp, data);
+    }
+
+    fn pop16(&mut self) -> u16 {
+        let data = self.mmu.borrow().read16(self.sp);
+        self.sp = self.sp.wrapping_add(2);
+        data
+    }
+
     fn emulate_jump_operation(&mut self, opcode: u8) -> u32 {
         match opcode {
             0xC2 => panic!("unimplemented!"),
@@ -230,12 +241,17 @@ impl Cpu {
             0xC4 | 0xCC => panic!("unimplemented opcode: {:#02x}", opcode),
             0xCD => { // call
                 let target = self.fetch16();
-                self.sp = self.sp - 2;
-                self.mmu.borrow_mut().write16(self.sp, self.pc);
+                self.push16(self.pc);
                 self.pc = target;
                 24
             },
-            0xD4 | 0xDC | 0xC0 | 0xC8 | 0xC9 | 0xD0 | 0xD8 | 0xD9  => panic!("unimplemented opcode: {:#02x}", opcode),
+            0xD4 | 0xDC | 0xC0 | 0xC8 => panic!("unimplemented opcode: {:#02x}", opcode),
+            0xC9 => { // ret
+                let target = self.pop16();
+                self.pc = target;
+                16
+            },
+            0xD0 | 0xD8 | 0xD9 => panic!("unimplemented opcode: {:#02x}", opcode),
             _ => panic!("unexpected opcode: {:#02x}", opcode),
         }
     }
@@ -390,12 +406,25 @@ impl Cpu {
                 self.set_flag(Flag::N, 1);
                 self.set_flag(Flag::H, 1);
             },
-            0x27 | 0x37 | 0x3F |
-            0x80 ..= 0x8F |
-            0x90 ..= 0x9F |
-            0xA0 ..= 0xAF => panic!("not implemented {:#02X}", opcode),
-            0xB0 ..= 0xBF | 0xFE => self.op_cp(opcode),
-            0xC6 | 0xD6 | 0xE6 | 0xF6 | 0xCE | 0xDE | 0xEE => panic!("not implemented!"),
+            0x27 | 0x37 | 0x3F => panic!("unimplemented opcode: {:#02X}", opcode),
+            0x80 ..= 0xBF | 0xC6 | 0xD6 | 0xE6 | 0xF6 | 0xCE | 0xDE | 0xEE | 0xFE => {
+                let operand = if opcode < 0xC0 {
+                    self.fetch_reg_operand(opcode)
+                } else {
+                    self.fetch()
+                };
+                match opcode {
+                    0x80 ..= 0x87 | 0xC6 => self.op_add(operand),
+                    0x88 ..= 0x8F | 0xCE => self.op_adc(operand),
+                    0x90 ..= 0x97 | 0xD6 => self.op_sub(operand),
+                    0x98 ..= 0x9F | 0xDE => self.op_sbc(operand),
+                    0xA0 ..= 0xA7 | 0xE6 => self.op_and(operand),
+                    0xA8 ..= 0xAF | 0xEE => self.op_xor(operand),
+                    0xB0 ..= 0xB7 | 0xF6 => self.op_or(operand),
+                    0xB8 ..= 0xBF | 0xFE => self.op_cp(operand),
+                    _ => panic!("impossible opcode for 8bit math/logic: {:#02X}", opcode),
+                }
+            }
             _ => panic!("impossible opcode for 8bit math/logic: {:#02X}", opcode),
         }
         let cpu_cycles = if opcode == 0x34 || opcode == 0x35 {
@@ -446,20 +475,79 @@ impl Cpu {
     }
 
 
+    fn op_add(&mut self, operand: u8) {
+        let sum = self.a.wrapping_add(operand);
+        self.set_flag(Flag::Z, if sum == 0 { 1 } else { 0 });
+        self.set_flag(Flag::N, 0);
+        self.set_flag(Flag::H, if (self.a & 0x0F) + (operand & 0x0F) > 0x0F { 1 } else { 0 });
+        self.set_flag(Flag::C, if sum < self.a { 1 } else { 0 });
+        self.a = sum
+    }
+
+
+    fn op_adc(&mut self, operand: u8) {
+        let c = if self.flags & Flag::C as u8 != 0 { 0x1 } else { 0x0 };
+        let operand_plus_c = operand.wrapping_add(c);
+        let sum = self.a.wrapping_add(operand_plus_c);
+        self.set_flag(Flag::Z, if sum == 0 { 1 } else { 0 });
+        self.set_flag(Flag::N, 0);
+        self.set_flag(Flag::H, if (self.a & 0x0F) + (operand_plus_c & 0x0F) > 0x0F { 1 } else { 0 });
+        self.set_flag(Flag::C, if sum < self.a { 1 } else { 0 });
+        self.a = sum
+    }
+ 
+    fn op_sub(&mut self, operand: u8) {
+        let diff = self.a.wrapping_sub(operand);
+        self.set_flag(Flag::Z, if diff == 0 { 1 } else { 0 });
+        self.set_flag(Flag::N, 1);
+        self.set_flag(Flag::H, if (self.a & 0x0F) < (operand & 0x0F) { 1 } else { 0 });
+        self.set_flag(Flag::C, if self.a < operand { 1 } else { 0 });
+        self.a = diff
+    }
+
+    fn op_sbc(&mut self, operand: u8) {
+        let c = if self.flags & Flag::C as u8 != 0 { 0x1 } else { 0x0 };
+        let operand_plus_c = operand.wrapping_add(c);
+        let diff = self.a.wrapping_sub(operand_plus_c);
+        self.set_flag(Flag::Z, if diff == 0 { 1 } else { 0 });
+        self.set_flag(Flag::N, 1);
+        self.set_flag(Flag::H, if (self.a & 0x0F) < (operand_plus_c & 0x0F) { 1 } else { 0 });
+        self.set_flag(Flag::C, if self.a < operand_plus_c { 1 } else { 0 });
+        self.a = diff
+    }
+
+    fn op_and(&mut self, operand: u8) {
+        self.a = self.a & operand;
+        self.set_flag(Flag::Z, if self.a == 0 { 1 } else { 0 });
+        self.set_flag(Flag::N, 0);
+        self.set_flag(Flag::H, 1);
+        self.set_flag(Flag::C, 0);
+    }
+
+    fn op_xor(&mut self, operand: u8) {
+        self.a = self.a ^ operand;
+        self.set_flag(Flag::Z, if self.a == 0 { 1 } else { 0 });
+        self.set_flag(Flag::N, 0);
+        self.set_flag(Flag::H, 0);
+        self.set_flag(Flag::C, 0);
+    }
+
+    fn op_or(&mut self, operand: u8) {
+        self.a = self.a | operand;
+        self.set_flag(Flag::Z, if self.a == 0 { 1 } else { 0 });
+        self.set_flag(Flag::N, 0);
+        self.set_flag(Flag::H, 0);
+        self.set_flag(Flag::C, 0);
+    }
+
     // compare the operand vs A, but don't store a result
-    fn op_cp(&mut self, opcode: u8)  {
-        let operand = match opcode {
-            0xB8 ..= 0xBF => self.fetch_reg_operand(opcode),
-            0xFE => self.fetch(),
-            _ => panic!("invalid opcode for op_cp: {:#02X}", opcode),
-        };
+    fn op_cp(&mut self, operand: u8)  {
         let result = self.a.wrapping_sub(operand);
         self.set_flag(Flag::C, if self.a < operand { 1 } else { 0 });
         self.set_flag(Flag::N, 1);
         self.set_flag(Flag::H, if (self.a & 0x0F) < (operand & 0x0F) { 1 } else { 0 });
         self.set_flag(Flag::Z, if result == 0 { 1 } else { 0 });
     }
- 
 
     fn emulate_8bit_rotation_or_shift(&mut self, opcode: u8) -> u32 {
         match opcode {
