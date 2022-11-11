@@ -29,7 +29,7 @@ impl MemoryManagementUnit {
     pub fn init(filepath: &str) -> Self {
         let cartridge = cartridge::init(filepath);
         let interrupts = Rc::new(RefCell::new(Interrupts::init()));
-        let mut mmu = Self {
+        let mmu = Self {
             cartridge: cartridge,
             apu: Apu::init(),
             gpu: Gpu::init(interrupts.clone()),

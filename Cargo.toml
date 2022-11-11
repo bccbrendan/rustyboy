@@ -2,9 +2,17 @@
 name = "rustyboy"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["bccbrendan"]
+description = "Toy Gameboy emulator written in Rust"
 
 [dependencies]
 argparse = "0.2"
 rog = "0.1.9"
+# renderer
+# input, events, images, sounds
+glow = "0.10.0"
+winit = "0.25.0"
+imgui = { git = "https://github.com/imgui-rs/imgui-rs.git", package="imgui", rev = "fa3404fbb5be1c67ab91c3daab48615691be6e15" }
+imgui_glow_renderer = { git = "https://github.com/imgui-rs/imgui-rs.git", package="imgui-glow-renderer", rev = "fa3404fbb5be1c67ab91c3daab48615691be6e15" }
+imgui_sdl2_support = { git = "https://github.com/imgui-rs/imgui-rs.git", package="imgui-sdl2-support", rev = "fa3404fbb5be1c67ab91c3daab48615691be6e15" }
+sdl2 = ">=0.34.0"
