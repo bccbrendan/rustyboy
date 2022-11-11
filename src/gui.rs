@@ -18,7 +18,8 @@ impl Gui {
         ui.window("Rustyboy")
             .size([0.0, 0.0], imgui::Condition::FirstUseEver)
             .build(|| {
-                ui.child_window("Cartridge and Audio")
+                ui.text("dummy    0xdead");
+                /*ui.child_window("Cartridge and Audio")
                     .size([200.00, 100.0])
                     .build(|| {
                         ui.child_window("Cartridge")
@@ -53,8 +54,9 @@ impl Gui {
                             ui.text("channel 4 (off): ");
                     });
                 });
-        ui.same_line();
-        ui.child_window("LCD and memory")
+                */
+        //ui.same_line();
+        /*ui.child_window("LCD and memory")
             .size([500.00, 100.0])
             .build(|| {
                 ui.child_window("LCD")
@@ -74,9 +76,9 @@ impl Gui {
                         // TODO select button
                     });
 
-            });
-        ui.same_line();
-        ui.child_window("CPU")
+            });*/
+        //ui.same_line();
+        /*ui.child_window("CPU")
             .build(|| {
                 ui.child_window("Registers")
                     .size([200.0, 200.0])
@@ -91,7 +93,9 @@ impl Gui {
                         ui.text("sp 2300");
                         ui.text("flags _ _ _ _");
                     });
-                ui.separator();
+                    */
+         //       ui.separator();
+                /*
                 ui.child_window("Disassembly")
                     .size([200.0, 300.0])
                     .build(|| {
@@ -116,14 +120,15 @@ impl Gui {
                         ui.text("tac: 00: tma: 00");
                         ui.text("tima: 00: div: 0A");
                     });
-            });
-            ui.child_window("Graphics")
+                    */
+        //    });
+          /*  ui.child_window("Graphics")
                 .build(|| {
                     ui.text("background:  on");
                     ui.text("    tileset: on");
                     ui.text("    tilemap: on");
                     ui.text("    scroll: (42, 24)");
-                })
+                }) */
         });
     }
 

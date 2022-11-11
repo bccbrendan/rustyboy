@@ -19,7 +19,7 @@ pub struct Frontend {
     pub imgui: Context,
     pub platform: SdlPlatform,
     pub renderer: AutoRenderer,
-    pub font: FontId,
+//    pub font: FontId,
 }
 
 
@@ -33,9 +33,12 @@ fn glow_context(window: &Window) -> glow::Context {
 pub fn init() -> Frontend {
     let sdl = sdl2::init().unwrap();
     let video_subsystem = sdl.video().unwrap();
+
+    // hint to SDL to initialize an OpenGL 3.3 core profile context
     let gl_attr = video_subsystem.gl_attr();
     gl_attr.set_context_version(3, 3);
     gl_attr.set_context_profile(GLProfile::Core);
+
     /* create a new window, be sure to call opengl method on the builder when using glow! */
     let window = video_subsystem
         .window("Rustyboy", 1280, 720)
@@ -45,30 +48,45 @@ pub fn init() -> Frontend {
         .resizable()
         .build()
         .unwrap();
+    
+    // Create a new OpenGL context and make it current
     let gl_context = window.gl_create_context().unwrap();
     window.gl_make_current(&gl_context).unwrap();
+
+    // enable vsync to cap framerate
+    window.subsystem().gl_set_swap_interval(1).unwrap();
+
+    // create new glow and imgui contexts
     let gl = glow_context(&window);
 
     let mut imgui = Context::create();
     imgui.set_ini_filename(None);
     imgui.set_log_filename(None);
 
+    // add fonts to imgui
+    imgui
+        .fonts()
+        .add_font(&[imgui::FontSource::DefaultFontData { config: None }]);
+    /*
     // set up text font
     let consolas = imgui.fonts().add_font(&[FontSource::TtfData {
         data: include_bytes!("../resources/Consolas.ttf"),
         size_pixels: 13.0,
         config: None,
     }]);
+    */
 
     let platform = SdlPlatform::init(&mut imgui);
     let renderer = AutoRenderer::initialize(gl, &mut imgui).unwrap();
+    let event_pump = sdl.event_pump().unwrap();
+
     Frontend {
         window: window,
-        event_pump: sdl.event_pump().unwrap(),
+        event_pump: event_pump,
         imgui: imgui,
         platform: platform,
         renderer: renderer,
-        font: consolas,
+//        font: consolas,
     }
 }
 
@@ -78,13 +96,13 @@ impl Frontend {
         self.platform.prepare_frame(&mut self.imgui, &self.window, &self.event_pump);
 
         let ui = self.imgui.new_frame();
-        gui.show(ui);
-        // ui.show_demo_window(&mut true);
+        // gui.show(ui);
+        ui.show_demo_window(&mut true);
 
         let draw_data = self.imgui.render();
 
         unsafe { 
-            self.renderer.gl_context().clear(glow::COLOR_BUFFER_BIT);
+            self.renderer.gl_context().clear(glow::COLOR_BUFFER_BIT)
         };
         self.renderer.render(draw_data).unwrap();
 
