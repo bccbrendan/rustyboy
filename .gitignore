@@ -15,3 +15,7 @@ Cargo.lock
 # Added by cargo
 
 /target
+
+
+# 3rd party binaries
+SDL2.dll

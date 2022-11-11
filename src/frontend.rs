@@ -11,6 +11,7 @@ use imgui_glow_renderer::AutoRenderer;
 use imgui_sdl2_support::{SdlPlatform};
 use super::gui;
 
+use glow::HasContext; // for gl_context.clear()
 
 pub struct Frontend {
     pub window: Window,
@@ -49,6 +50,9 @@ pub fn init() -> Frontend {
     let gl = glow_context(&window);
 
     let mut imgui = Context::create();
+    imgui.set_ini_filename(None);
+    imgui.set_log_filename(None);
+
     // set up text font
     let consolas = imgui.fonts().add_font(&[FontSource::TtfData {
         data: include_bytes!("../resources/Consolas.ttf"),
@@ -56,8 +60,8 @@ pub fn init() -> Frontend {
         config: None,
     }]);
 
-    let mut platform = SdlPlatform::init(&mut imgui);
-    let mut renderer = AutoRenderer::initialize(gl, &mut imgui).unwrap();
+    let platform = SdlPlatform::init(&mut imgui);
+    let renderer = AutoRenderer::initialize(gl, &mut imgui).unwrap();
     Frontend {
         window: window,
         event_pump: sdl.event_pump().unwrap(),
@@ -75,11 +79,13 @@ impl Frontend {
 
         let ui = self.imgui.new_frame();
         gui.show(ui);
-        //ui.show_demo_window(&mut true);
+        // ui.show_demo_window(&mut true);
 
         let draw_data = self.imgui.render();
 
-        // unsafe { self.renderer.gl_context().clear(glow::COLOR_BUFFER_BIT) };
+        unsafe { 
+            self.renderer.gl_context().clear(glow::COLOR_BUFFER_BIT);
+        };
         self.renderer.render(draw_data).unwrap();
 
         self.window.gl_swap_window();

@@ -15,4 +15,5 @@ winit = "0.25.0"
 imgui = { git = "https://github.com/imgui-rs/imgui-rs.git", package="imgui", rev = "fa3404fbb5be1c67ab91c3daab48615691be6e15" }
 imgui_glow_renderer = { git = "https://github.com/imgui-rs/imgui-rs.git", package="imgui-glow-renderer", rev = "fa3404fbb5be1c67ab91c3daab48615691be6e15" }
 imgui_sdl2_support = { git = "https://github.com/imgui-rs/imgui-rs.git", package="imgui-sdl2-support", rev = "fa3404fbb5be1c67ab91c3daab48615691be6e15" }
+# NB! for missing SDL2.lib linker errors, be sure to follow setup guide at https://crates.io/crates/sdl2
 sdl2 = ">=0.34.0"

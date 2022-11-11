@@ -3,12 +3,12 @@ use super::interrupts::Interrupts;
 use super::memory::Memory;
 
 pub struct SerialCable {
-    interrupts: Rc<RefCell<Interrupts>>,
+    _interrupts: Rc<RefCell<Interrupts>>,
 }
 
 impl SerialCable {
-    pub fn init(interrupts: Rc<RefCell<Interrupts>>) -> Self {
-        SerialCable { interrupts }
+    pub fn init(_interrupts: Rc<RefCell<Interrupts>>) -> Self {
+        SerialCable { _interrupts }
     }
 }
 
