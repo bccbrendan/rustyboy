@@ -1,5 +1,4 @@
-mod gui;
-use rustyboy::main_board::MainBoard;
+use rustyboy::{gui::Gui, main_board::MainBoard, execution_modes::ExecutionMode};
 
 use glow::HasContext;
 use imgui::Context;
@@ -75,7 +74,7 @@ fn main() {
     let mut platform = SdlPlatform::init(&mut imgui);
     let mut renderer = AutoRenderer::initialize(gl, &mut imgui).unwrap();
     let mut event_pump = sdl.event_pump().unwrap();
-    let mut gui = gui::Gui { lcd_scale: 2 };
+    let mut gui = Gui { lcd_scale: 2, execution_mode: ExecutionMode::Stopped };
 
     'main: loop {
         for event in event_pump.poll_iter() {
@@ -91,7 +90,7 @@ fn main() {
         platform.prepare_frame(&mut imgui, &window, &event_pump);
 
         let ui = imgui.new_frame();
-        gui.show(ui);
+        let execution_mode = gui.show(ui);
 
         let draw_data = imgui.render();
 
@@ -100,7 +99,12 @@ fn main() {
 
         window.gl_swap_window();
 
-        // main_board.emulate_frame();
+        match execution_mode {
+            ExecutionMode::Running => main_board.emulate_frame(),
+            ExecutionMode::CpuOperation => main_board.emulate_cpu_operation(),
+            ExecutionMode::Frame => main_board.emulate_frame(),
+            ExecutionMode::Stopped => 0,
+        };
     }
 }
 

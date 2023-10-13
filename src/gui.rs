@@ -1,44 +1,68 @@
 use imgui::Ui;
 
+use super::execution_modes::ExecutionMode;
+
 pub struct Gui {
     pub lcd_scale: u8,
+    pub execution_mode: ExecutionMode,
 }
 
 impl Default for Gui {
     fn default() -> Self {
         Gui {
             lcd_scale: 1,
+            execution_mode: ExecutionMode::Stopped,
         }
     }
 }
 
 impl Gui {
 
-    pub fn show(&mut self, ui: &mut Ui) {
+    pub fn show(&mut self, ui: &mut Ui) -> ExecutionMode {
+        self.execution_mode = match self.execution_mode {
+            ExecutionMode::CpuOperation => ExecutionMode::Stopped,
+            ExecutionMode::Frame => ExecutionMode::Stopped,
+            _ => self.execution_mode,
+        };
         ui.window("Rustyboy")
             .size([0.0, 0.0], imgui::Condition::FirstUseEver)
             .build(|| {
                 ui.child_window("Cartridge and Audio")
-                    .size([200.00, 100.0])
+                    .size([200.0, 400.0])
                     .build(|| {
                         ui.child_window("Cartridge")
+                            .size([0.0, 100.0])
                             .build(|| {
                                 ui.text("title: 123456789AB");
-                                ui.text("Type: MCB1?");
+                                ui.text("type: MCB1?");
                                 ui.text("CCB: None");
-                                ui.button("Load ROM");
+                                ui.button("load ROM");
                         });
                     ui.separator();
                     ui.child_window("Controls")
+                        .size([200.0, 100.0])
                         .build(|| {
-                            ui.button("Go");
+                            if ui.button("go")
+                            {
+                                self.execution_mode = ExecutionMode::Running;
+                            }
                             ui.same_line();
-                            ui.button("Stop");
-                            ui.button("step");
-                            ui.button("step frame");
+                            if ui.button("stop")
+                            {
+                                self.execution_mode = ExecutionMode::Stopped;
+                            }
+                            if ui.button("step")
+                            {
+                                self.execution_mode = ExecutionMode::CpuOperation;
+                            }
+                            if ui.button("step frame")
+                            {
+                                self.execution_mode = ExecutionMode::Frame;
+                            }
                     });
                     ui.separator();
                     ui.child_window("APU")
+                        .size([0.0, 0.0])
                         .build(|| {
                             ui.button("mute");
                             ui.same_line();
@@ -63,7 +87,7 @@ impl Gui {
                         ui.slider("scale", 1, 4, &mut self.lcd_scale);
                         // let lcd_image_size = imgui::ImVec2(160 * state.lcd_scale, 144 * state.lcd_scale);
                         let window_size = Ui::window_size(ui);
-                        // imgui::image();
+                        let draw_list = ui.get_window_draw_list();
                         // TODO select button
                     });
 
@@ -101,7 +125,7 @@ impl Gui {
                         ui.text(" 4244: XOR A, A");
                     });
                 ui.child_window("Interrupts")
-                    .size([0.0, 1.0])
+                    .size([200.0, 200.0])
                     .build(|| {
                         ui.text("cycles 12");
                         ui.separator();
@@ -118,6 +142,7 @@ impl Gui {
                     });
             });
             ui.child_window("Graphics")
+                .size([200.0, 200.0])
                 .build(|| {
                     ui.text("background:  on");
                     ui.text("    tileset: on");
@@ -125,6 +150,7 @@ impl Gui {
                     ui.text("    scroll: (42, 24)");
                 })
         });
+        return self.execution_mode
     }
 
 }

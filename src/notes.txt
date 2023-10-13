@@ -1,0 +1,12 @@
+notes: 
+
+good ui demo here: https://preview.redd.it/239zt1gt6mo81.gif?width=704&format=mp4&s=4a2fe428d8da165f5c97823874e4ba64dd20fbf6
+
+awesome ui: https://i.redd.it/jpkzcjxy8qv61.png
+
+
+3 columns:
+
+c1: file, controls, audio
+c2: lcd, memory
+c3: tab <cpu, graphics>

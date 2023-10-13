@@ -1,6 +1,7 @@
 pub mod apu;
 pub mod cartridge;
 pub mod cpu;
+pub mod execution_modes;
 pub mod palette;
 pub mod gpu;
 pub mod gui;
