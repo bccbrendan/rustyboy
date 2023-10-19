@@ -72,15 +72,15 @@ pub enum Flag {
 pub struct Cpu {
     pub mmu: Rc<RefCell<dyn Memory>>,
     flags: u8,
-    a: u8,
-    b: u8,
-    c: u8,
-    d: u8,
-    e: u8,
-    h: u8,
-    l: u8,
-    sp: u16,  // stack pointer
-    pc: u16,  // program counter
+    pub a: u8,
+    pub b: u8,
+    pub c: u8,
+    pub d: u8,
+    pub e: u8,
+    pub h: u8,
+    pub l: u8,
+    pub sp: u16,  // stack pointer
+    pub pc: u16,  // program counter
 }
 
 
@@ -101,6 +101,7 @@ impl Cpu {
             pc: 0x0100,
         }
     }
+    
 
     fn is_set(&self, f: Flag) -> bool {
         self.flags & f as u8 != 0
@@ -112,6 +113,18 @@ impl Cpu {
             0 => self.flags &= !(f as u8),
             _ => panic!("Invalid arg to set_flag: {}", set),
         }
+    }
+
+    pub fn flags_as_str(&self) -> String {
+        let mut result = String::new();
+        result.push(if self.is_set(Flag::Z) { 'Z' } else { '_' });
+        result.push(' ');
+        result.push(if self.is_set(Flag::N) { 'N' } else { '_' });
+        result.push(' ');
+        result.push(if self.is_set(Flag::H) { 'H' } else { '_' });
+        result.push(' ');
+        result.push(if self.is_set(Flag::C) { 'C' } else { '_' });
+        return result
     }
 
     pub fn emulate_operation(&mut self) -> u32{

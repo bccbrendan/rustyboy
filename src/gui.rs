@@ -1,5 +1,6 @@
 use imgui::Ui;
 
+use super::main_board::MainBoard;
 use super::execution_modes::ExecutionMode;
 
 pub struct Gui {
@@ -18,7 +19,7 @@ impl Default for Gui {
 
 impl Gui {
 
-    pub fn show(&mut self, ui: &mut Ui) -> ExecutionMode {
+    pub fn show(&mut self, ui: &mut Ui, main_board: &mut MainBoard) -> ExecutionMode {
         self.execution_mode = match self.execution_mode {
             ExecutionMode::CpuOperation => ExecutionMode::Stopped,
             ExecutionMode::Frame => ExecutionMode::Stopped,
@@ -105,15 +106,15 @@ impl Gui {
                 ui.child_window("Registers")
                     .size([200.0, 200.0])
                     .build(|| {
-                        ui.text("a    00");
-                        ui.text("b    00");
-                        ui.text("c    00");
-                        ui.text("d    00");
-                        ui.text("e    00");
-                        ui.text("hl 1200");
-                        ui.text("pc 1200");
-                        ui.text("sp 2300");
-                        ui.text("flags _ _ _ _");
+                        ui.text(format!("a     {:02X}", main_board.cpu.a));
+                        ui.text(format!("b     {:02X}", main_board.cpu.b));
+                        ui.text(format!("c     {:02X}", main_board.cpu.c));
+                        ui.text(format!("d     {:02X}", main_board.cpu.d));
+                        ui.text(format!("e     {:02X}", main_board.cpu.e));
+                        ui.text(format!("hl    {:02X}{:02X}", main_board.cpu.h, main_board.cpu.l));
+                        ui.text(format!("pc    {:04X}", main_board.cpu.pc));
+                        ui.text(format!("sp    {:04X}", main_board.cpu.sp));
+                        ui.text(format!("flags {}", main_board.cpu.flags_as_str()));
                     });
                 ui.separator();
                 ui.child_window("Disassembly")

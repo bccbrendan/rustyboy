@@ -90,7 +90,7 @@ fn main() {
         platform.prepare_frame(&mut imgui, &window, &event_pump);
 
         let ui = imgui.new_frame();
-        let execution_mode = gui.show(ui);
+        let execution_mode = gui.show(ui, &mut main_board);
 
         let draw_data = imgui.render();
 
