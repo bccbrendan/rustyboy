@@ -74,7 +74,7 @@ fn main() {
     let mut platform = SdlPlatform::init(&mut imgui);
     let mut renderer = AutoRenderer::initialize(gl, &mut imgui).unwrap();
     let mut event_pump = sdl.event_pump().unwrap();
-    let mut gui = Gui { lcd_scale: 2, execution_mode: ExecutionMode::Stopped };
+    let mut gui = Gui::default();
 
     'main: loop {
         for event in event_pump.poll_iter() {

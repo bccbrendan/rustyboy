@@ -1,11 +1,18 @@
 use imgui::Ui;
 
+use crate::cpu::OP_MNEMONICS;
+use crate::cpu::OP_CB_MNEMONICS;
+use crate::memory::Memory;
+
 use super::main_board::MainBoard;
 use super::execution_modes::ExecutionMode;
 
 pub struct Gui {
     pub lcd_scale: u8,
     pub execution_mode: ExecutionMode,
+    pub disassembly_start_address: u16,
+    pub disassembly_end_address: u16,
+    pub disassembly_lines_to_print: u16,
 }
 
 impl Default for Gui {
@@ -13,6 +20,9 @@ impl Default for Gui {
         Gui {
             lcd_scale: 1,
             execution_mode: ExecutionMode::Stopped,
+            disassembly_start_address: 0x100,
+            disassembly_end_address: 0x100 + 16,
+            disassembly_lines_to_print: 16,
         }
     }
 }
@@ -120,10 +130,7 @@ impl Gui {
                 ui.child_window("Disassembly")
                     .size([200.0, 300.0])
                     .build(|| {
-                        ui.text("Disassembly");
-                        ui.text(">4242: LD A, A");
-                        ui.text(" 4243: AND A, A");
-                        ui.text(" 4244: XOR A, A");
+                        ui.text(self.get_disassembly_text(&main_board));
                     });
                 ui.child_window("Interrupts")
                     .size([200.0, 200.0])
@@ -154,4 +161,51 @@ impl Gui {
         return self.execution_mode
     }
 
+    fn set_disassembly_window_pc(&mut self, main_board: &MainBoard, current_pc: u16) {
+        if current_pc < self.disassembly_start_address || current_pc > self.disassembly_end_address {
+            self.disassembly_start_address = current_pc;
+            self.disassembly_end_address = get_last_address_in_disassembly_text(main_board, current_pc, self.disassembly_lines_to_print);
+        }
+    }
+
+    fn get_disassembly_text(&mut self, main_board: &MainBoard) -> String {
+        let current_pc = main_board.cpu.pc.wrapping_sub(1);
+        self.set_disassembly_window_pc(main_board, current_pc);
+        let mut result = "Disassembly\n".to_string();
+        let mut i = 0;
+        while i < self.disassembly_lines_to_print {
+            let current_address = self.disassembly_start_address.wrapping_add(1 + i);
+            result.push(if current_address == main_board.cpu.pc { '>' } else { ' ' });
+            let (operation, size) = get_disassembled_operation(main_board, current_address);
+            result.push_str(&operation);
+            i = i.wrapping_add(size);
+        }
+        return result;
+    }
+
+ 
+
 }
+
+fn get_disassembled_operation(main_board: &MainBoard, pc: u16) -> (String, u16) {
+    let opcode = main_board.mmu.borrow().read8(pc);
+    if opcode != 0xCB {
+        (format!("[{:04X}]   {:02X} | {}\n", pc, opcode, OP_MNEMONICS[opcode as usize]), 1)
+    } else {
+        let cb_opcode = main_board.mmu.borrow().read8(pc.wrapping_add(1));
+        (format!("[{:04X}] {:02X}{:02X} | {}\n", pc, opcode, cb_opcode, OP_CB_MNEMONICS[cb_opcode as usize]), 2)
+    }
+}
+
+fn get_last_address_in_disassembly_text(main_board: &MainBoard, starting_address: u16, addresses_to_print: u16) -> u16 {
+    let mut i = 0;
+    let mut current_address = starting_address;
+    while i < addresses_to_print {
+        let opcode = main_board.mmu.borrow().read8(starting_address.wrapping_add(i));
+        current_address = current_address + if opcode == 0xcb { 2 } else { 1 };
+        i = i + 1;
+    }
+    current_address
+}
+
+        
