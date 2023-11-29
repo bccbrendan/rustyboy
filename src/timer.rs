@@ -1,17 +1,17 @@
-use std::{rc::Rc, cell::RefCell};
-use super::interrupts::Interrupts;
+// use std::{rc::Rc, cell::RefCell};
+// use super::interrupts::Interrupts;
 use super::memory::Memory;
 
 // https://gbdev.io/pandocs/Timer_and_Divider_Registers.html
 pub struct Timer {
-    interrupts: Rc<RefCell<Interrupts>>,
+    // interrupts: Rc<RefCell<Interrupts>>,
     div: u8,
 }
 
 impl Timer {
-    pub fn init(interrupts: Rc<RefCell<Interrupts>>) -> Self {
+    pub fn init(/*interrupts: Rc<RefCell<Interrupts>>*/) -> Self {
         Timer {
-            interrupts: interrupts,
+            // interrupts: interrupts,
             div: 0
         }
     }

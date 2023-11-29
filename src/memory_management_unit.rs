@@ -17,7 +17,7 @@ pub struct MemoryManagementUnit {
     pub joypad: Joypad,
     pub serial_cable: SerialCable,
     pub timer: Timer,
-    interrupts: Rc<RefCell<Interrupts>>,
+    // interrupts: Rc<RefCell<Interrupts>>,
     // hdma,
     pub work_ram_c000: [u8; 4096],  //wram
     pub work_ram_d000: [u8; 4096],  //wram
@@ -35,8 +35,8 @@ impl MemoryManagementUnit {
             gpu: Gpu::init(interrupts.clone()),
             joypad: Joypad::init(interrupts.clone()),
             serial_cable: SerialCable::init(interrupts.clone()),
-            timer: Timer::init(interrupts.clone()),
-            interrupts: interrupts.clone(),
+            timer: Timer::init(/*interrupts.clone()*/),
+            // interrupts: interrupts.clone(),
             work_ram_c000: [0x0; 4096],
             work_ram_d000: [0x0; 4096],
             hram: [0x0; 128],

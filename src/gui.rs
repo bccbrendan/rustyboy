@@ -96,8 +96,8 @@ impl Gui {
                         ui.text("LCD");
                         ui.slider("scale", 1, 4, &mut self.lcd_scale);
                         // let lcd_image_size = imgui::ImVec2(160 * state.lcd_scale, 144 * state.lcd_scale);
-                        let window_size = Ui::window_size(ui);
-                        let draw_list = ui.get_window_draw_list();
+                        // let window_size = Ui::window_size(ui);
+                        // let draw_list = ui.get_window_draw_list();
                         // TODO select button
                     });
 

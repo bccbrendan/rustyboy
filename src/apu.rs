@@ -20,7 +20,7 @@ impl Memory for Apu {
 
     fn write8(&mut self, addr: u16, data: u8) {
         match addr {
-            _ => panic!("unimplemented address write on Apu {:#04x}", addr)
+            _ => panic!("unimplemented address write on Apu {:#04x}, value: {:#02x}", addr, data)
         }
     }
 }

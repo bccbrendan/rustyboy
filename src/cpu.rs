@@ -93,7 +93,9 @@ pub enum Flag {
 }
 
 enum IncrementMode {
-    None, Increment, Decrement
+    // None,
+    Increment,
+    Decrement,
 }
 
 
@@ -212,13 +214,13 @@ impl Cpu {
     }
 
     // get an address formed by concatenating H and L together. optionally increment/decrement
-    fn getHL(&mut self, increment_mode: IncrementMode) -> u16 {
+    fn get_hl(&mut self, increment_mode: IncrementMode) -> u16 {
         let hl = ((self.h as u16) << 8) | self.l as u16;
         let mut new_hl = hl;
         new_hl = match increment_mode {
             IncrementMode::Increment => { new_hl.wrapping_add(1) },
             IncrementMode::Decrement => { new_hl.wrapping_sub(1) },
-            IncrementMode::None => new_hl,
+            // IncrementMode::None => new_hl,
         };
         self.h = ((new_hl >> 8) & 0xFF) as u8;
         self.l = (new_hl & 0xFF) as u8;
@@ -274,7 +276,7 @@ impl Cpu {
     }
 
     fn push16(&mut self, data: u16) {
-        self.sp.wrapping_sub(2);
+        let _ = self.sp.wrapping_sub(2);
         self.mmu.borrow_mut().write16(self.sp, data);
     }
 
@@ -338,8 +340,8 @@ impl Cpu {
                 let addr = match (opcode & 0xF0) >> 4 {
                     0 => (self.b as u16) << 8 | self.c as u16,
                     1 => (self.d as u16) << 8 | self.e as u16,
-                    2 => self.getHL(IncrementMode::Increment),
-                    3 => self.getHL(IncrementMode::Decrement),
+                    2 => self.get_hl(IncrementMode::Increment),
+                    3 => self.get_hl(IncrementMode::Decrement),
                     _ => panic!("invalid 8bit LD opcode {:02X}", opcode),
                 };
                 if opcode & 0x0F == 0x2 {

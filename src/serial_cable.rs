@@ -22,7 +22,7 @@ impl Memory for SerialCable {
 
     fn write8(&mut self, addr: u16, data: u8) {
         match addr {
-            _ => panic!("unimplemented address write on SerialCable {:#04x}", addr)
+            _ => panic!("unimplemented address write on SerialCable {:#04x}, value: {:#02x}", addr, data)
         }
     }
 }

@@ -60,10 +60,10 @@ impl Cartridge for NoMbc {
 
 }
 
-enum BankMode {
+/*enum BankMode {
     SimpleRomBanking,
-    RamBankingOrAdvancedRomBanking,
-}
+//    RamBankingOrAdvancedRomBanking,
+}*/
 
 /* Mbc1 - A memory bank controller - may have a battery, and may have ram
    https://gbdev.io/pandocs/MBC1.html */
@@ -73,7 +73,7 @@ struct Mbc1 {
     ram_enable: bool,
     rom_bank: u8,
     ram_bank: u8,
-    banking_mode_select: BankMode,
+    // banking_mode_select: BankMode,
 }
 
 impl Mbc1 {
@@ -93,7 +93,7 @@ impl Mbc1 {
             ram_enable: false,
             rom_bank: 0x1,
             ram_bank: 0x0,
-            banking_mode_select: BankMode::SimpleRomBanking,
+            // banking_mode_select: BankMode::SimpleRomBanking,
         }
     }
 }
