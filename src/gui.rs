@@ -1,7 +1,6 @@
 use imgui::Ui;
 
-use crate::cpu::OP_MNEMONICS;
-use crate::cpu::OP_CB_MNEMONICS;
+use crate::cpu;
 use crate::memory::Memory;
 
 use super::main_board::MainBoard;
@@ -178,7 +177,7 @@ impl Gui {
             result.push(if current_address == main_board.cpu.pc { '>' } else { ' ' });
             let (operation, size) = get_disassembled_operation(main_board, current_address);
             result.push_str(&operation);
-            i = i.wrapping_add(size);
+            i = i.wrapping_add(size.into());
         }
         return result;
     }
@@ -187,13 +186,13 @@ impl Gui {
 
 }
 
-fn get_disassembled_operation(main_board: &MainBoard, pc: u16) -> (String, u16) {
+fn get_disassembled_operation(main_board: &MainBoard, pc: u16) -> (String, u8) {
     let opcode = main_board.mmu.borrow().read8(pc);
     if opcode != 0xCB {
-        (format!("[{:04X}]   {:02X} | {}\n", pc, opcode, OP_MNEMONICS[opcode as usize]), 1)
+        (format!("[{:04X}]   {:02X} | {}\n", pc, opcode, cpu::OP_MNEMONICS[opcode as usize]), cpu::OP_SIZES[opcode as usize])
     } else {
         let cb_opcode = main_board.mmu.borrow().read8(pc.wrapping_add(1));
-        (format!("[{:04X}] {:02X}{:02X} | {}\n", pc, opcode, cb_opcode, OP_CB_MNEMONICS[cb_opcode as usize]), 2)
+        (format!("[{:04X}] {:02X}{:02X} | {}\n", pc, opcode, cb_opcode, cpu::OP_CB_MNEMONICS[cb_opcode as usize]), cpu::OP_CB_SIZE)
     }
 }
 

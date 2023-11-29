@@ -21,6 +21,27 @@ pub const OP_MNEMONICS: [&str; 256] = [
     "LDH A,(a8)", "POP AF", "LD A,(C)", "DI", "UNKNOWN", "PUSH AF", "OR d8", "RST 30H", "LD HL,SP+r8", "LD SP,HL", "LD A,(a16)", "EI", "UNKNOWN", "UNKNOWN", "CP d8", "RST 38H",
 ];
 
+// note, '0xcb' in this table is marked as size 1 as that's a special prefix opcode that tells us to interpret the next byte as a 0xcb-prefixed opcode.
+// note, unknown opcodes (e.g. 0xD4) in this table are given size 1
+pub const OP_SIZES: [u8; 256] = [
+    1, 3, 1, 1, 1, 1, 2, 1, 3, 1, 1, 1, 1, 1, 2, 1,
+    1, 3, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1,
+    2, 3, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1,
+    2, 3, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 3, 3, 3, 1, 2, 1, 1, 1, 3, 1, 3, 3, 2, 1,
+    1, 1, 3, 1, 3, 1, 2, 1, 1, 1, 3, 1, 3, 1, 2, 1,
+    2, 1, 1, 1, 1, 1, 2, 1, 2, 1, 3, 1, 1, 1, 2, 1,
+    2, 1, 1, 1, 1, 1, 2, 1, 2, 1, 3, 1, 1, 1, 2, 1,
+];
+
 pub const OP_CB_MNEMONICS: [&str; 256] = [
     "RLC B", "RLC C", "RLC D", "RLC E", "RLC H", "RLC L", "RLC (HL)", "RLC A", "RRC B", "RRC C", "RRC D", "RRC E", "RRC H", "RRC L", "RRC (HL)", "RRC A",
     "RL B", "RL C", "RL D", "RL E", "RL H", "RL L", "RL (HL)", "RL A", "RR B", "RR C", "RR D", "RR E", "RR H", "RR L", "RR (HL)", "RR A",
@@ -39,6 +60,8 @@ pub const OP_CB_MNEMONICS: [&str; 256] = [
     "SET 4,B", "SET 4,C", "SET 4,D", "SET 4,E", "SET 4,H", "SET 4,L", "SET 4,(HL)", "SET 4,A", "SET 5,B", "SET 5,C", "SET 5,D", "SET 5,E", "SET 5,H", "SET 5,L", "SET 5,(HL)", "SET 5,A",
     "SET 6,B", "SET 6,C", "SET 6,D", "SET 6,E", "SET 6,H", "SET 6,L", "SET 6,(HL)", "SET 6,A", "SET 7,B", "SET 7,C", "SET 7,D", "SET 7,E", "SET 7,H", "SET 7,L", "SET 7,(HL)", "SET 7,A",
 ];
+
+pub const OP_CB_SIZE: u8 = 2;  // each operation that starts with a 0xcb prefix has one additional byte for a total of 2
 
 // https://gbdev.io/pandocs/CPU_Registers_and_Flags.html
 #[derive(Copy, Clone)]
@@ -68,6 +91,12 @@ pub enum Flag {
     */
     C = 1 << 4,
 }
+
+enum IncrementMode {
+    None, Increment, Decrement
+}
+
+
 
 pub struct Cpu {
     pub mmu: Rc<RefCell<dyn Memory>>,
@@ -182,6 +211,20 @@ impl Cpu {
         w
     }
 
+    // get an address formed by concatenating H and L together. optionally increment/decrement
+    fn getHL(&mut self, increment_mode: IncrementMode) -> u16 {
+        let hl = ((self.h as u16) << 8) | self.l as u16;
+        let mut new_hl = hl;
+        new_hl = match increment_mode {
+            IncrementMode::Increment => { new_hl.wrapping_add(1) },
+            IncrementMode::Decrement => { new_hl.wrapping_sub(1) },
+            IncrementMode::None => new_hl,
+        };
+        self.h = ((new_hl >> 8) & 0xFF) as u8;
+        self.l = (new_hl & 0xFF) as u8;
+        hl
+    }
+
     // based on https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html, this is true for many opcodes
     fn fetch_reg_operand(&self, opcode: u8) -> u8 {
         let operand = match opcode & 0x7 {
@@ -290,10 +333,27 @@ impl Cpu {
 
     fn emulate_8bit_load_operation(&mut self, opcode: u8) -> u32 {
         match opcode {
-            0x02 | 0x06 | 0x08 | 0x0A | 0x0E |
-            0x12 | 0x16 | 0x18 | 0x1A | 0x1E |
-            0x22 | 0x26 | 0x28 | 0x2A | 0x2E |
-            0x32 | 0x36 | 0x38 | 0x3A | 0x3E |
+            // move between A and an address
+            0x02 | 0x12 | 0x22 | 0x32 | 0x0A | 0x1A | 0x2A | 0x3A => {
+                let addr = match (opcode & 0xF0) >> 4 {
+                    0 => (self.b as u16) << 8 | self.c as u16,
+                    1 => (self.d as u16) << 8 | self.e as u16,
+                    2 => self.getHL(IncrementMode::Increment),
+                    3 => self.getHL(IncrementMode::Decrement),
+                    _ => panic!("invalid 8bit LD opcode {:02X}", opcode),
+                };
+                if opcode & 0x0F == 0x2 {
+                    self.mmu.borrow_mut().write8(addr, self.a);
+                } else {
+                    self.a = self.mmu.borrow().read8(addr);
+                }
+                8
+            },
+
+            0x06 | 0x08 | 0x0E |
+            0x16 | 0x18 | 0x1E |
+            0x26 | 0x28 | 0x2E |
+            0x36 | 0x38 | 0x3E |
             0x40 ..= 0x7F |
             0xE2 | 0xEA |
             0xF2 | 0xF8 | 0xFA => panic!("LD Not yet implemented: {:#02X}", opcode),
